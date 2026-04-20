@@ -67,3 +67,54 @@ BEGIN
     RETURN ROUND(v_percentage, 2);
 END;
 $$;
+
+-- ==================================================
+-- 3. Procedure: notify_low_attendance_students
+-- Demonstrates: CURSOR, OPEN / FETCH / CLOSE, LOOP, EXIT WHEN NOT FOUND
+-- Iterates row-by-row over every student whose attendance < 75%
+-- and inserts a personalised warning Notification for each one.
+-- ==================================================
+CREATE OR REPLACE PROCEDURE notify_low_attendance_students()
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    -- Cursor iterates over the low_attendance_students view
+    cur_low CURSOR FOR
+        SELECT student_id,
+               username,
+               first_name,
+               last_name,
+               course_name,
+               attendance_percentage
+        FROM   low_attendance_students;
+
+    rec         RECORD;   -- holds one fetched row at a time
+    v_msg       TEXT;
+BEGIN
+    OPEN cur_low;
+
+    LOOP
+        FETCH cur_low INTO rec;
+        EXIT WHEN NOT FOUND;          -- exit loop when no more rows
+
+        -- Build a personalised warning message
+        v_msg := format(
+            'Attendance Alert: Dear %s %s, your attendance in "%s" is %.2f%% — below the required 75%%. Please attend classes regularly.',
+            rec.first_name,
+            rec.last_name,
+            rec.course_name,
+            rec.attendance_percentage
+        );
+
+        -- Insert notification; skip silently if identical message already exists
+        INSERT INTO Notifications (user_id, message, is_read)
+        VALUES (rec.student_id, v_msg, FALSE)
+        ON CONFLICT DO NOTHING;
+
+        RAISE NOTICE 'Notified student % (id=%) — %.2f%%',
+            rec.username, rec.student_id, rec.attendance_percentage;
+    END LOOP;
+
+    CLOSE cur_low;
+END;
+$$;

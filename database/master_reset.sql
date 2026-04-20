@@ -259,6 +259,49 @@ BEGIN
 END;
 $$;
 
+-- Procedure: notify_low_attendance_students (uses CURSOR)
+-- Iterates row-by-row over every student below 75% attendance
+-- and inserts a personalised warning Notification for each one.
+-- Demonstrates: CURSOR, OPEN / FETCH / CLOSE, LOOP, EXIT WHEN NOT FOUND
+CREATE OR REPLACE PROCEDURE notify_low_attendance_students()
+LANGUAGE plpgsql AS $$
+DECLARE
+    cur_low CURSOR FOR
+        SELECT student_id,
+               username,
+               first_name,
+               last_name,
+               course_name,
+               attendance_percentage
+        FROM   low_attendance_students;
+
+    rec    RECORD;
+    v_msg  TEXT;
+BEGIN
+    OPEN cur_low;
+    LOOP
+        FETCH cur_low INTO rec;
+        EXIT WHEN NOT FOUND;
+
+        v_msg := format(
+            'Attendance Alert: Dear %s %s, your attendance in "%s" is %.2f%% — below the required 75%%. Please attend classes regularly.',
+            rec.first_name,
+            rec.last_name,
+            rec.course_name,
+            rec.attendance_percentage
+        );
+
+        INSERT INTO Notifications (user_id, message, is_read)
+        VALUES (rec.student_id, v_msg, FALSE)
+        ON CONFLICT DO NOTHING;
+
+        RAISE NOTICE 'Notified student % (id=%) — %.2f%%',
+            rec.username, rec.student_id, rec.attendance_percentage;
+    END LOOP;
+    CLOSE cur_low;
+END;
+$$;
+
 -- ==================================================
 -- STEP 5: TRIGGERS
 -- ==================================================
@@ -349,6 +392,46 @@ FROM AttendanceSessions sess
 JOIN Sections sec ON sess.section_id = sec.section_id
 JOIN Courses  c   ON sec.course_id   = c.course_id
 LEFT JOIN Faculty f ON sess.created_by = f.faculty_id;
+
+-- 4. View: Sections with High Enrolment (GROUP BY + HAVING)
+-- HAVING filters AFTER aggregation; shows sections with more than 1 enrolled student.
+CREATE OR REPLACE VIEW high_enrolment_sections AS
+SELECT
+    sec.section_id,
+    c.course_code,
+    c.course_name,
+    sec.semester,
+    sec.academic_year,
+    COUNT(e.student_id)  AS enrolled_students
+FROM Sections    sec
+JOIN Courses     c ON sec.course_id = c.course_id
+JOIN Enrollments e ON e.section_id  = sec.section_id
+GROUP BY
+    sec.section_id,
+    c.course_code,
+    c.course_name,
+    sec.semester,
+    sec.academic_year
+HAVING COUNT(e.student_id) > 1;
+
+-- 5. View: Department Attendance Summary (GROUP BY + HAVING + AVG aggregate)
+-- Shows only departments where average attendance falls below 80%.
+CREATE OR REPLACE VIEW dept_low_avg_attendance AS
+SELECT
+    d.dept_id,
+    d.dept_name,
+    COUNT(DISTINCT s.student_id)                    AS total_students,
+    ROUND(AVG(
+        calculate_attendance_percentage(s.student_id, sec.section_id)
+    ), 2)                                            AS avg_attendance_pct
+FROM Departments  d
+JOIN Students     s   ON s.dept_id     = d.dept_id
+JOIN Enrollments  e   ON e.student_id  = s.student_id
+JOIN Sections     sec ON sec.section_id = e.section_id
+GROUP BY d.dept_id, d.dept_name
+HAVING ROUND(AVG(
+    calculate_attendance_percentage(s.student_id, sec.section_id)
+), 2) < 80.0;
 
 -- ==================================================
 -- STEP 7: SEED DATA
