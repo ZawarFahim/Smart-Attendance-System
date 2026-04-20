@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Attendify – Database ERD</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --accent:    #58a6ff;
+      --accent2:   #3fb950;
+      --accent3:   #f78166;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --glow:      rgba(88, 166, 255, 0.15);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 2rem 3rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, #161b22 0%, #0d1117 100%);
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .logo {
+      width: 52px; height: 52px;
+      background: linear-gradient(135deg, var(--accent), #1f6feb);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem;
+      box-shadow: 0 0 24px var(--glow);
+      flex-shrink: 0;
+    }
+
+    .header-text h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      background: linear-gradient(90deg, var(--accent), #79c0ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-text p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 0.2rem;
+    }
+
+    /* ── Legend ── */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem 2rem;
+      padding: 1rem 3rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .legend-item { display: flex; align-items: center; gap: 0.5rem; }
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+    }
+
+    /* ── Stats ── */
+    .stats {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      padding: 1.25rem 3rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .stat-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--glow);
+    }
+    .stat-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Diagram wrapper ── */
+    .diagram-container {
+      flex: 1;
+      overflow: auto;
+      padding: 2rem 3rem 3rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .mermaid {
+      min-width: 900px;
+      background: transparent !important;
+    }
+
+    /* Mermaid entity colour overrides */
+    .mermaid svg { max-width: none !important; }
+
+    /* ── Footer ── */
+    footer {
+      padding: 1rem 3rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      background: var(--surface);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo">🎓</div>
+  <div class="header-text">
+    <h1>Attendify – Entity Relationship Diagram</h1>
+    <p>Smart Attendance Management System · PostgreSQL Database Schema · 16 Entities</p>
+  </div>
+</header>
+
+<!-- ── LEGEND ── -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#58a6ff"></div> Core Identity</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3fb950"></div> Academic</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f78166"></div> Attendance</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#d2a8ff"></div> Scheduling</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ffa657"></div> System / Audit</div>
+  <div class="legend-item"><span style="color:var(--accent)">PK</span> – Primary Key</div>
+  <div class="legend-item"><span style="color:var(--accent2)">FK</span> – Foreign Key</div>
+  <div class="legend-item"><span style="color:var(--muted)">||--o{</span> – One-to-Many</div>
+  <div class="legend-item"><span style="color:var(--muted)">}o--o{</span> – Many-to-Many</div>
+</div>
+
+<!-- ── STATS ── -->
+<div class="stats">
+  <div class="stat-card"><div class="stat-value">16</div><div class="stat-label">Tables</div></div>
+  <div class="stat-card"><div class="stat-value">21</div><div class="stat-label">Relationships</div></div>
+  <div class="stat-card"><div class="stat-value">70+</div><div class="stat-label">Attributes</div></div>
+  <div class="stat-card"><div class="stat-value">3</div><div class="stat-label">User Roles</div></div>
+  <div class="stat-card"><div class="stat-value">7</div><div class="stat-label">Indexes</div></div>
+</div>
+
+<!-- ── MERMAID ERD ── -->
+<div class="diagram-container">
+  <div class="mermaid">
+erDiagram
+
+    %% ── CORE IDENTITY ──────────────────────────────
+    Users {
+        int    user_id       PK
+        string username      "UNIQUE NOT NULL"
+        string email         "UNIQUE NOT NULL"
+        string password_hash "NOT NULL"
+        string role          "Admin | Faculty | Student"
+        ts     created_at    "DEFAULT now()"
+    }
+
+    Departments {
+        int    dept_id   PK
+        string dept_name "UNIQUE NOT NULL"
+    }
+
+    %% ── PEOPLE ─────────────────────────────────────
+    Students {
+        int  student_id       PK "FK → Users"
+        string first_name     "NOT NULL"
+        string last_name      "NOT NULL"
+        date enrollment_date  "DEFAULT today"
+        int  dept_id          FK
+    }
+
+    Faculty {
+        int  faculty_id  PK "FK → Users"
+        string first_name "NOT NULL"
+        string last_name  "NOT NULL"
+        date hire_date    "DEFAULT today"
+        int  dept_id      FK
+    }
+
+    %% ── ACADEMIC ────────────────────────────────────
+    Courses {
+        int    course_id   PK
+        string course_code "UNIQUE NOT NULL"
+        string course_name "NOT NULL"
+        int    credits     "CHECK > 0"
+        int    dept_id     FK
+    }
+
+    Rooms {
+        int    room_id   PK
+        string room_name "UNIQUE NOT NULL"
+        int    capacity  "CHECK > 0"
+    }
+
+    Sections {
+        int    section_id    PK
+        int    course_id     FK
+        int    faculty_id    FK
+        int    room_id       FK
+        string semester      "NOT NULL"
+        string academic_year "NOT NULL"
+    }
+
+    Enrollments {
+        int  enrollment_id PK
+        int  student_id    FK
+        int  section_id    FK
+        date enrolled_date "DEFAULT today"
+    }
+
+    %% ── ATTENDANCE ──────────────────────────────────
+    AttendanceStatus {
+        int    status_id   PK
+        string status_name "Present | Absent | Late | Excused"
+    }
+
+    AttendanceSessions {
+        int  session_id   PK
+        int  section_id   FK
+        date session_date "NOT NULL"
+        time start_time   "NOT NULL"
+        time end_time     "NOT NULL"
+        int  created_by   FK "→ Faculty"
+    }
+
+    StudentAttendance {
+        int    attendance_id PK
+        int    session_id    FK
+        int    student_id    FK
+        int    status_id     FK
+        string remarks       "VARCHAR(255)"
+    }
+
+    FacultyAttendance {
+        int  faculty_attendance_id PK
+        int  faculty_id            FK
+        date date                  "NOT NULL"
+        int  status_id             FK
+    }
+
+    %% ── SCHEDULING ──────────────────────────────────
+    Timetable {
+        int    timetable_id PK
+        int    section_id   FK
+        string day_of_week  "Mon–Sun"
+        time   start_time   "NOT NULL"
+        time   end_time     "NOT NULL"
+        int    room_id      FK
+    }
+
+    %% ── SYSTEM / AUDIT ──────────────────────────────
+    LeaveRequests {
+        int    leave_id    PK
+        int    user_id     FK
+        date   start_date  "NOT NULL"
+        date   end_date    "NOT NULL"
+        text   reason      "NOT NULL"
+        string status      "Pending | Approved | Rejected"
+        int    reviewed_by FK "→ Users"
+        ts     created_at  "DEFAULT now()"
+    }
+
+    Notifications {
+        int    notification_id PK
+        int    user_id         FK
+        text   message         "NOT NULL"
+        bool   is_read         "DEFAULT false"
+        ts     created_at      "DEFAULT now()"
+    }
+
+    AuditLogs {
+        int    log_id     PK
+        int    user_id    FK
+        string action     "INSERT | UPDATE | DELETE"
+        string table_name "NOT NULL"
+        int    record_id
+        ts     timestamp  "DEFAULT now()"
+    }
+
+    %% ── RELATIONSHIPS ───────────────────────────────
+    Users            ||--o| Students          : "profile (1:1)"
+    Users            ||--o| Faculty           : "profile (1:1)"
+    Departments      ||--o{ Students          : "belongs to"
+    Departments      ||--o{ Faculty           : "belongs to"
+    Departments      ||--o{ Courses           : "offers"
+    Courses          ||--o{ Sections          : "has"
+    Faculty          ||--o{ Sections          : "teaches"
+    Rooms            ||--o{ Sections          : "assigned to"
+    Students         ||--o{ Enrollments       : "enrolled in"
+    Sections         ||--o{ Enrollments       : "has enrollees"
+    Sections         ||--o{ AttendanceSessions: "has sessions"
+    Faculty          ||--o{ AttendanceSessions: "created by"
+    AttendanceSessions ||--o{ StudentAttendance: "records"
+    Students         ||--o{ StudentAttendance : "marked in"
+    AttendanceStatus ||--o{ StudentAttendance : "defines status"
+    Faculty          ||--o{ FacultyAttendance  : "tracked in"
+    AttendanceStatus ||--o{ FacultyAttendance  : "defines status"
+    Sections         ||--o{ Timetable         : "scheduled in"
+    Rooms            ||--o{ Timetable         : "used in"
+    Users            ||--o{ LeaveRequests     : "submits"
+    Users            ||--o{ Notifications     : "receives"
+    Users            ||--o{ AuditLogs         : "generates"
+
+  </div>
+</div>
+
+<!-- ── FOOTER ── -->
+<footer>
+  Attendify Smart Attendance Management System &nbsp;·&nbsp; ERD generated from <code>schema.sql</code> &nbsp;·&nbsp; PostgreSQL
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor:        '#1f6feb',
+      primaryTextColor:    '#e6edf3',
+      primaryBorderColor:  '#58a6ff',
+      lineColor:           '#58a6ff',
+      secondaryColor:      '#161b22',
+      tertiaryColor:       '#0d1117',
+      background:          '#0d1117',
+      mainBkg:             '#161b22',
+      nodeBorder:          '#30363d',
+      clusterBkg:          '#161b22',
+      titleColor:          '#e6edf3',
+      edgeLabelBackground: '#161b22',
+      attributeBackgroundColorEven: '#0d1117',
+      attributeBackgroundColorOdd:  '#161b22',
+    },
+    er: {
+      diagramPadding: 40,
+      layoutDirection: 'TB',
+      minEntityWidth: 100,
+      minEntityHeight: 75,
+      entityPadding: 15,
+      useMaxWidth: false,
+    }
+  });
+</script>
+</body>
+</html>
