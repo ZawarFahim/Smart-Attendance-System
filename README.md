@@ -8,6 +8,10 @@ ATTENDIFY is a robust, modular, and enterprise-grade Python application for mana
 - Advanced SQL Triggers, Stored Procedures, and Views.
 - Complete modular setup.
 - Login validation & Role-based Dashboards (Admin / Faculty / Student).
+- **Data Analytics**: Visual reporting via `matplotlib`.
+- **Data Export**: Export to CSV using `pandas`.
+- **Modern UI**: Sleek, modern Windows-11 style interface with Dark/Light mode support powered by `sv-ttk`.
+- **System Broadcasts**: Admin panel for broadcasting important updates to specific roles.
 
 ## System Requirements
 - Python 3.9+

@@ -4,6 +4,7 @@ Provides the skeleton for sidebar navigation and main content area.
 """
 import tkinter as tk
 from tkinter import ttk, messagebox
+import sv_ttk
 from config.settings import COLORS, FONTS, WINDOW_GEOMETRY
 from utils.helpers import clear_frame, center_window
 from services.auth_service import change_password, verify_current_password
@@ -16,25 +17,21 @@ class BaseDashboard(tk.Tk):
         
         self.title(f"ATTENDIFY - {title}")
         self.geometry(WINDOW_GEOMETRY)
-        self.configure(bg=COLORS['background'])
         center_window(self, 1024, 768)
         
-        # Apply themes to ttk
+        # Apply sv-ttk theme
+        sv_ttk.set_theme("dark")
+        
         style = ttk.Style()
-        style.theme_use('clam')
-        style.configure("Sidebar.TFrame", background=COLORS['primary'])
-        style.configure("Content.TFrame", background=COLORS['background'])
-        style.configure("PageTitle.TLabel", background=COLORS['background'], foreground=COLORS['text_dark'], font=FONTS['h1'])
-        style.configure("Card.TFrame", background=COLORS['text_light'], relief='flat')
-        style.configure("CardHeader.TLabel", background=COLORS['text_light'], foreground=COLORS['primary'], font=FONTS['h2'])
-        style.configure("CardBody.TLabel", background=COLORS['text_light'], foreground=COLORS['text_dark'], font=FONTS['body'])
-        style.configure("Accent.TButton", background=COLORS['secondary'], foreground=COLORS['text_light'], font=FONTS['body_bold'])
-        style.map("Accent.TButton", background=[("active", "#14a085")])
-        style.configure("Sidebar.TButton", 
-                        background=COLORS['primary'], 
-                        foreground=COLORS['text_light'], 
-                        font=FONTS['body_bold'], borderwidth=0)
-        style.map("Sidebar.TButton", background=[("active", COLORS['secondary'])])
+        style.configure("PageTitle.TLabel", font=FONTS['h1'])
+        style.configure("CardHeader.TLabel", font=FONTS['h2'])
+        style.configure("CardBody.TLabel", font=FONTS['body'])
+        
+        # Maintain backwards compatibility for styles used in child classes
+        style.configure("Card.TFrame")
+        style.configure("Content.TFrame")
+        style.configure("Sidebar.TFrame")
+        style.configure("Sidebar.TButton", font=FONTS['body_bold'])
 
         # Layout Grids
         self.grid_rowconfigure(0, weight=1)
@@ -42,22 +39,27 @@ class BaseDashboard(tk.Tk):
 
         # Build Sidebar
         self.sidebar_frame = ttk.Frame(self, style="Sidebar.TFrame")
-        self.sidebar_frame.grid(row=0, column=0, sticky="ns")
+        self.sidebar_frame.grid(row=0, column=0, sticky="ns", padx=(10, 0), pady=10)
 
         # Build Content Area
         self.content_frame = ttk.Frame(self, style="Content.TFrame")
-        self.content_frame.grid(row=0, column=1, sticky="nsew")
+        self.content_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
 
         self._build_sidebar_header()
         self.setup_menu()
 
+    def toggle_theme(self):
+        if sv_ttk.get_theme() == "dark":
+            sv_ttk.set_theme("light")
+        else:
+            sv_ttk.set_theme("dark")
+
     def _build_sidebar_header(self):
         """Header with User Info."""
-        header_lbl = tk.Label(self.sidebar_frame, 
+        header_lbl = ttk.Label(self.sidebar_frame, 
                               text=f"Welcome,\n{self.user_info['username']}", 
-                              bg=COLORS['primary'], fg=COLORS['text_light'], 
-                              font=FONTS['h2'], pady=20, padx=10)
-        header_lbl.pack(fill='x')
+                              font=FONTS['h2'], justify="center")
+        header_lbl.pack(fill='x', pady=20, padx=10)
         
         logout_btn = ttk.Button(self.sidebar_frame, text="Log Out", 
                                 style="Sidebar.TButton", command=self.logout)
@@ -66,6 +68,10 @@ class BaseDashboard(tk.Tk):
         change_pw_btn = ttk.Button(self.sidebar_frame, text="Change Password", 
                                    style="Sidebar.TButton", command=self.show_change_password)
         change_pw_btn.pack(side='bottom', fill='x', pady=(10, 0))
+
+        theme_btn = ttk.Button(self.sidebar_frame, text="Toggle Theme", 
+                               style="Sidebar.TButton", command=self.toggle_theme)
+        theme_btn.pack(side='bottom', fill='x', pady=(10, 0))
 
     def show_change_password(self):
         def view():

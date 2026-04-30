@@ -29,8 +29,12 @@ from services.admin_service import (
     get_audit_logs
 )
 from services.leave_service import get_all_leave_requests, review_leave_request
-from services.notification_service import create_notification
-
+from services.notification_service import create_notification, broadcast_notification
+from tkinter import filedialog
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from services.analytics_service import get_overall_attendance_stats, get_department_attendance_rates
+from services.export_service import export_attendance_to_csv
 class AdminDashboard(BaseDashboard):
     def __init__(self, user_info, on_logout=None):
         super().__init__("Admin Panel", user_info, on_logout)
@@ -42,6 +46,8 @@ class AdminDashboard(BaseDashboard):
         self.add_menu_item("Academic Setup", self.show_academic_setup)
         self.add_menu_item("Leave Requests", self.show_leave_requests)
         self.add_menu_item("Audit Logs", self.show_audit_logs)
+        self.add_menu_item("Analytics", self.show_analytics)
+        self.add_menu_item("Broadcast", self.show_broadcast)
         
         # Default view
         self.show_overview()
@@ -770,4 +776,106 @@ class AdminDashboard(BaseDashboard):
 
             tree.bind("<<TreeviewSelect>>", on_select)
             load_leave_requests()
+        self.switch_view(view)
+
+    def show_analytics(self):
+        def view():
+            ttk.Label(self.content_frame, text="Attendance Analytics", style="PageTitle.TLabel").pack(pady=(24, 16))
+            
+            # Export Section
+            export_frame = ttk.Frame(self.content_frame, style="Card.TFrame", padding=16)
+            export_frame.pack(fill='x', padx=20, pady=(0, 20))
+            
+            ttk.Label(export_frame, text="Data Export", style="CardHeader.TLabel").pack(side='left')
+            
+            def handle_export():
+                filepath = filedialog.asksaveasfilename(
+                    defaultextension=".csv",
+                    filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+                    title="Save Attendance Report"
+                )
+                if not filepath:
+                    return
+                success, msg = export_attendance_to_csv(filepath)
+                if success:
+                    messagebox.showinfo("Export Successful", msg)
+                else:
+                    messagebox.showerror("Export Failed", msg)
+            
+            ttk.Button(export_frame, text="Export Full Attendance Report (CSV)", style="Accent.TButton", command=handle_export).pack(side='right')
+
+            # Charts Section
+            charts_frame = ttk.Frame(self.content_frame)
+            charts_frame.pack(fill='both', expand=True, padx=20, pady=(0, 20))
+            
+            # Overall Attendance Stats Pie Chart
+            stats = get_overall_attendance_stats()
+            if stats:
+                fig1 = Figure(figsize=(5, 4), dpi=100)
+                ax1 = fig1.add_subplot(111)
+                labels = [s['status_name'] for s in stats]
+                sizes = [s['count'] for s in stats]
+                ax1.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90, colors=['#2ecc71', '#e74c3c', '#f1c40f', '#3498db'])
+                ax1.axis('equal')
+                ax1.set_title('Overall Attendance Breakdown')
+                
+                canvas1 = FigureCanvasTkAgg(fig1, master=charts_frame)
+                canvas1.draw()
+                canvas1.get_tk_widget().pack(side='left', fill='both', expand=True, padx=(0, 10))
+            
+            # Department Attendance Rates Bar Chart
+            dept_rates = get_department_attendance_rates()
+            if dept_rates:
+                fig2 = Figure(figsize=(5, 4), dpi=100)
+                ax2 = fig2.add_subplot(111)
+                depts = [d['dept_name'] for d in dept_rates]
+                rates = [float(d['present_rate']) for d in dept_rates]
+                
+                ax2.bar(depts, rates, color='#3498db')
+                ax2.set_ylabel('Present Rate (%)')
+                ax2.set_title('Attendance Rate by Department')
+                ax2.set_ylim(0, 100)
+                fig2.autofmt_xdate() # Rotate x labels
+                
+                canvas2 = FigureCanvasTkAgg(fig2, master=charts_frame)
+                canvas2.draw()
+                canvas2.get_tk_widget().pack(side='right', fill='both', expand=True, padx=(10, 0))
+
+        self.switch_view(view)
+
+    def show_broadcast(self):
+        def view():
+            ttk.Label(self.content_frame, text="System Broadcast", style="PageTitle.TLabel").pack(pady=(24, 16))
+            
+            form = ttk.Frame(self.content_frame, style="Card.TFrame", padding=24)
+            form.pack(fill='x', padx=20, pady=12)
+            
+            ttk.Label(form, text="Send an important notification to all users of a specific role.", style="CardBody.TLabel").pack(anchor='w', pady=(0, 16))
+            
+            ttk.Label(form, text="Target Audience", style="CardBody.TLabel").pack(anchor='w', pady=(0, 4))
+            role_combo = ttk.Combobox(form, values=["All", "Student", "Faculty"], state='readonly', font=FONTS['body'])
+            role_combo.pack(fill='x', pady=(0, 16))
+            role_combo.set("All")
+            
+            ttk.Label(form, text="Message", style="CardBody.TLabel").pack(anchor='w', pady=(0, 4))
+            message_text = tk.Text(form, height=6, font=FONTS['body'])
+            message_text.pack(fill='x', pady=(0, 16))
+            
+            def send_broadcast():
+                role = role_combo.get().strip()
+                message = message_text.get("1.0", "end").strip()
+                
+                if not message:
+                    messagebox.showerror("Validation Error", "Message cannot be empty.")
+                    return
+                
+                if messagebox.askyesno("Confirm Broadcast", f"Are you sure you want to broadcast this to {role}?"):
+                    if broadcast_notification(role, message):
+                        messagebox.showinfo("Success", "Broadcast sent successfully!")
+                        message_text.delete("1.0", "end")
+                    else:
+                        messagebox.showerror("Error", "Failed to send broadcast.")
+            
+            ttk.Button(form, text="Send Broadcast", style="Accent.TButton", command=send_broadcast).pack(anchor='e')
+
         self.switch_view(view)

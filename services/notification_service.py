@@ -14,3 +14,15 @@ def mark_as_read(notification_id):
 def create_notification(user_id, message):
     query = "INSERT INTO Notifications (user_id, message) VALUES (%s, %s)"
     return execute_query(query, (user_id, message))
+
+def broadcast_notification(role, message):
+    """
+    Send a notification to all users of a specific role, or all users if role is 'All'.
+    """
+    if role == 'All':
+        query = "INSERT INTO Notifications (user_id, message) SELECT user_id, %s FROM Users"
+        params = (message,)
+    else:
+        query = "INSERT INTO Notifications (user_id, message) SELECT user_id, %s FROM Users WHERE role = %s"
+        params = (message, role)
+    return execute_query(query, params)

@@ -16,6 +16,8 @@ from services.timetable_service import get_timetable_for_faculty
 from services.leave_service import create_leave_request, get_leave_requests_for_user
 from services.notification_service import get_notifications, mark_as_read
 from utils.validators import is_valid_date
+from tkinter import filedialog
+from services.export_service import export_attendance_to_csv
 from datetime import datetime
 
 class FacultyDashboard(BaseDashboard):
@@ -86,6 +88,31 @@ class FacultyDashboard(BaseDashboard):
             for s in sections:
                 tree.insert("", "end", values=(s['section_id'], s['course_code'], s['course_name'], s['semester']))
                 
+            actions_frame = ttk.Frame(self.content_frame, style="Content.TFrame")
+            actions_frame.pack(fill='x', padx=20, pady=(0, 16))
+            
+            def export_section_attendance():
+                sel = tree.selection()
+                if not sel:
+                    messagebox.showwarning("Selection Required", "Please select a section to export.")
+                    return
+                section_id = int(tree.item(sel[0], "values")[0])
+                
+                filepath = filedialog.asksaveasfilename(
+                    defaultextension=".csv",
+                    filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+                    title="Save Section Attendance Report"
+                )
+                if not filepath:
+                    return
+                success, msg = export_attendance_to_csv(filepath, section_id=section_id)
+                if success:
+                    messagebox.showinfo("Export Successful", msg)
+                else:
+                    messagebox.showerror("Export Failed", msg)
+            
+            ttk.Button(actions_frame, text="Export Section Attendance to CSV", style="Accent.TButton", command=export_section_attendance).pack(side='right')
+
         self.switch_view(view)
 
     def show_timetable(self):
