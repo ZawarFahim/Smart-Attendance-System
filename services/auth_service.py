@@ -1,8 +1,8 @@
 """
 Auth service.
 """
-from config.db_config import fetch_all, execute_query
-from utils.auth import verify_password, hash_password
+from db import fetch_all, execute_query
+from utils.helpers import verify_password, hash_password
 
 def authenticate(login_id, provided_password):
     """Verifies user credentials by email or username and returns user details if valid."""

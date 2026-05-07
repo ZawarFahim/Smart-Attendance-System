@@ -1,7 +1,7 @@
 """
 Attendance Service module to handle all attendance related logic.
 """
-from config.db_config import fetch_all, execute_query
+from db import fetch_all, execute_query
 
 def get_assigned_sections(faculty_id):
     """Fetch sections assigned to a specific faculty member."""
@@ -21,7 +21,7 @@ def create_session(section_id, session_date, start_time, end_time, created_by):
     '''
     # We need the returning session id
     import psycopg2
-    from config.db_config import get_connection
+    from db import get_connection
     conn = get_connection()
     if conn:
         try:
@@ -71,10 +71,10 @@ def get_attendance_history(student_id):
     return fetch_all(query, (student_id,))
 
 def get_student_overall_attendance(student_id, section_id):
-    """Gets the percentage via the Postgres function created."""
+    """Gets the percentage via the Postgres function calculate_attendance_percentage."""
     query = "SELECT calculate_attendance_percentage(%s, %s) AS percentage"
     result = fetch_all(query, (student_id, section_id))
-    return result[0]['percentage'] if result else 0.0
+    return float(result[0]['percentage']) if result else 0.0
 
 def get_student_sections(student_id):
     """Fetch sections enrolled by a student."""

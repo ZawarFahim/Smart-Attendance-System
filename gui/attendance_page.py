@@ -1,0 +1,1 @@
+# Placeholder for attendance_page.py

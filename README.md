@@ -1,114 +1,194 @@
-# ATTENDIFY – Smart Attendance Management System
+# ATTENDIFY - Smart Attendance Management System
 
-ATTENDIFY is a robust, modular, and enterprise-grade Python application for managing student attendance, faculty schedules, and administrative reporting. Built according to clean architecture, it separates Database functionality, Service logic bridging, and User Interface management into distinct components.
+A comprehensive, modular University Database Management System (DBMS) project. This project implements advanced PostgreSQL concepts through a clean Tkinter GUI, providing role-based access for Admins, Faculty, and Students to manage coursework, timetables, and attendance records.
 
-## Features Required By the Spec
-- 100% Python with `Tkinter` (ttk) for the UI.
-- `PostgreSQL` Database interaction using `psycopg2`.
-- Advanced SQL Triggers, Stored Procedures, and Views.
-- Complete modular setup.
-- Login validation & Role-based Dashboards (Admin / Faculty / Student).
-- **Data Analytics**: Visual reporting via `matplotlib`.
-- **Data Export**: Export to CSV using `pandas`.
-- **Modern UI**: Sleek, modern Windows-11 style interface with Dark/Light mode support powered by `sv-ttk`.
-- **System Broadcasts**: Admin panel for broadcasting important updates to specific roles.
+## Features
+- **Role-Based Access Control**: Separate dashboards for Admins, Faculty, and Students.
+- **Attendance Tracking**: Real-time attendance logging, calculating aggregated attendance percentages.
+- **Academic Setup**: Manage Departments, Courses, Rooms, and Sections.
+- **Timetable Scheduling**: Handle weekly schedules and exam timetables with clash detection.
+- **Leave Management**: Review and approve/reject leave requests.
+- **System Audit Logging**: Track database insertions, updates, and deletions using database triggers.
 
-## System Requirements
-- Python 3.9+
-- PostgreSQL 12+
+## Technologies Used
+- **Language**: Python 3.10+
+- **Database**: PostgreSQL 14+
+- **GUI Framework**: Tkinter + `sv_ttk` (Sun Valley Theme)
+- **Database Driver**: `psycopg2`
+- **Data Export**: Built-in `csv` module
 
-## Installation & Setup
+## Folder Structure Explanation
+```
+ProjectStructure/
+│
+├── app.py                   # Main application entry point
+├── db.py                    # Database connection setup
+├── requirements.txt         # Python dependencies
+├── .gitignore               # Git ignored files
+├── README.md                # Project documentation
+├── Report.docx              # Project report placeholder
+│
+├── services/                # Business logic and database operations
+│   ├── auth_service.py
+│   ├── attendance_service.py
+│   ├── timetable_service.py
+│   ├── report_service.py
+│   └── user_service.py
+│
+├── gui/                     # Graphical User Interface modules
+│   ├── login.py
+│   ├── admin_dashboard.py
+│   ├── faculty_dashboard.py
+│   ├── student_dashboard.py
+│   ├── attendance_page.py
+│   ├── timetable_page.py
+│   └── reports_page.py
+│
+├── utils/                   # Shared utilities and helpers
+│   ├── validators.py
+│   ├── helpers.py
+│   ├── constants.py
+│   └── exporters.py
+│
+├── assets/                  # Images, icons, and themes
+│   ├── icons/
+│   └── themes/
+│
+└── sql/                     # PostgreSQL schema definition and logic
+    ├── 01_tables.sql        # Table structures
+    ├── 02_constraints.sql   # Foreign keys and check constraints
+    ├── 03_indexes.sql       # Performance optimization indexes
+    ├── 04_views.sql         # Complex SELECT combinations
+    ├── 05_triggers.sql      # Automated auditing
+    ├── 06_procedures.sql    # Transactional logic
+    ├── 07_functions.sql     # Data calculations
+    ├── 08_cursors.sql       # Procedural data processing
+    ├── 09_seed_data.sql     # Test application data
+    └── 10_master_reset.sql  # Master execution script
+```
 
-1. **Clone the Repository (or navigate to workspace):**
-   ```bash
-   cd "ATTENDIFY – Smart Attendance Management System"
-   ```
+## Database Concepts Implemented
+This project rigorously demonstrates the following core DBMS concepts:
+1. **Views**: Abstracted complex joins (e.g., `student_attendance_report`).
+2. **Triggers**: Automated audit logging capturing table changes.
+3. **Stored Procedures**: Encapsulated transaction logic for marking attendance.
+4. **Functions**: Custom math calculations for student attendance percentages.
+5. **Cursors**: Processing high volumes of data row-by-row (e.g., notifications).
+6. **Transactions**: Explicit `COMMIT` and `ROLLBACK` for multi-table inserts.
+7. **Indexes**: Composite indexing for faster lookups.
+8. **Constraints**: `CHECK` rules preventing overlapping end/start times.
+9. **Joins**: Comprehensive inner, left, and right joins throughout `services/`.
+10. **Aggregate Queries**: Use of `SUM()`, `COUNT()`, `COALESCE()`.
+11. **HAVING Clauses**: Advanced filtering on aggregate data.
+12. **Subqueries**: Used within cursors and reports.
 
-2. **Install Dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Installation Guide (Run From Scratch)
 
-3. **Database Setup:**
-   Ensure your local PostgreSQL server is running.
-   Create an empty database named `attendify`.
-   Run the SQL files located in `/database` in this order (e.g., using `psql`, pgAdmin, or DBeaver):
-   - `schema.sql`
-   - `procedures.sql`
-   - `triggers.sql`
-   - `views.sql`
-   - `seed.sql`
+### 1. Configure Python Environment
+Install the required python packages using pip:
+```bash
+pip install -r requirements.txt
+```
 
-   *(Update `database.ini` credentials to match your PostgreSQL instance configuration if different from the default).*
-   
-   **One-click reset option (pgAdmin):**
-   - Run `database/master_reset.sql` to perform full reset + setup in one script.
+### 2. Configure Database Credentials
+Edit the `db.py` file to include your local PostgreSQL connection credentials (Host, Username, Password).
 
-4. **Launch Application:**
-   ```bash
-   python main.py
-   ```
+### 3. PostgreSQL Database Initialization
+Open your `psql` terminal or pgAdmin, and create the database:
+```sql
+CREATE DATABASE attendify;
+\c attendify
+```
 
-## Seed Accounts For Testing
-All seeded accounts use login text matching their stored hashed equivalents (e.g., plaintext configured in early run setup):
-- **Admin**: Email: `admin@attendify.edu` | Pass: `admin123`
-- **Faculty**: Email: `faculty1@attendify.edu` | Pass: `fac123`
-- **Student**: Email: `student1@attendify.edu` | Pass: `stud123`
+### 4. Execute SQL Files in Order
+You can run all files using the provided master reset script from the command line:
+```bash
+psql -U postgres -d attendify -f "sql/10_master_reset.sql"
+```
+Or manually run them in this exact order:
+1. `01_tables.sql`
+2. `02_constraints.sql`
+3. `03_indexes.sql`
+4. `04_views.sql`
+5. `05_triggers.sql`
+6. `06_procedures.sql`
+7. `07_functions.sql`
+8. `08_cursors.sql`
+9. `09_seed_data.sql`
 
-## Architecture Highlights
-- `config/`: Configurations for database parsing and centralized GUI styling constants.
-- `database/`: Raw SQL for tables (fully normalized 3NF), views, multi-insert functions.
-- `utils/`: Data validation tools.
-- `services/`: Business abstractions to decouple UI directly from db context.
-- `gui/`: Interactive nested Tkinter elements broken into hierarchical dashboards per role.
+### 5. Launch the Application
+Run the Python application:
+```bash
+python app.py
+```
 
----
+## Default Test Credentials
+The `09_seed_data.sql` file creates sample users for testing out of the box.
 
-## Database Normalization (1NF → 2NF → 3NF)
+- **Admin Account**: 
+  - Username: `admin1`
+  - Password: `admin123`
+- **Faculty Account**: 
+  - Username: `fac1`
+  - Password: `fac123`
+- **Student Account**: 
+  - Username: `stud1`
+  - Password: `stud123`
 
-The schema is fully compliant with **Third Normal Form (3NF)**. Evidence:
+## Screenshots
+*(Insert screenshots of the Login, Admin Dashboard, and Attendance Pages here)*
 
-### First Normal Form (1NF) ✅
-- Every table has a **primary key** (`SERIAL PRIMARY KEY`).
-- All columns store **atomic values** — no repeating groups or multi-valued cells.
-- Example: a student's department is stored as a single `dept_id` FK, not a comma-separated list.
+## Academic Documentation
 
-### Second Normal Form (2NF) ✅
-_(Applies to tables with composite primary keys)_
-- `StudentAttendance` has composite key `(session_id, student_id)`.  
-  - `status_id` and `remarks` depend on the **full composite key**, not on just one part of it. ✅
-- `Enrollments` has composite key `(student_id, section_id)`.  
-  - `enrolled_date` depends on the full key (when that specific student enrolled in that specific section). ✅
-- No partial dependencies exist anywhere.
+### 1. Extended Entity-Relationship (EER) Modeling
+This project utilizes EER mapping to represent inheritance (Specialization/Generalization):
+- **Superclass**: `Users` (Contains common attributes like `user_id`, `username`, `password_hash`).
+- **Subclasses**: `Students` and `Faculty`.
+- Both subclasses use their `student_id` or `faculty_id` as both a Primary Key and a Foreign Key linking back to `Users(user_id)`. This effectively implements a 1:1 disjoint relationship constraint.
 
-### Third Normal Form (3NF) ✅
-- No **transitive dependencies** (non-key column depending on another non-key column).
-- Department info (`dept_name`) is stored once in `Departments` — not repeated inside `Students` or `Faculty`.
-- Course info is stored in `Courses` — not duplicated inside `Sections` or `StudentAttendance`.
-- Status names live in `AttendanceStatus` — not as raw strings across multiple tables.
+### 2. Relational Algebra Mapping
+The application relies on SQL queries that map to core Relational Algebra concepts:
 
-### BCNF (Boyce–Codd NF) ✅
-- Every determinant in every table is a candidate key, satisfying BCNF.
+1. **Selection (σ)**: Finding a specific user.
+   - *SQL*: `SELECT * FROM Users WHERE username = 'admin1';`
+   - *Algebra*: σ<sub>username='admin1'</sub>(Users)
+2. **Projection (π)**: Fetching only specific columns for privacy.
+   - *SQL*: `SELECT username, role FROM Users;`
+   - *Algebra*: π<sub>username, role</sub>(Users)
+3. **Join (⨝)**: Fetching enrollments with course names.
+   - *SQL*: `SELECT * FROM Enrollments e JOIN Sections s ON e.section_id = s.section_id;`
+   - *Algebra*: Enrollments ⨝<sub>Enrollments.section_id = Sections.section_id</sub> Sections
+4. **Union (∪)**: Combining Student and Faculty schedules (Conceptual).
+   - *Algebra*: (π<sub>user_id</sub>(Students)) ∪ (π<sub>user_id</sub>(Faculty))
+5. **Set Difference (-)**: Finding Unenrolled Students.
+   - *SQL*: `SELECT student_id FROM Students EXCEPT SELECT student_id FROM Enrollments;`
+   - *Algebra*: π<sub>student_id</sub>(Students) - π<sub>student_id</sub>(Enrollments)
 
----
+### 3. Normalization Proof (Up to BCNF)
+The database was designed to prevent Insert, Update, and Delete anomalies:
+- **UNF (Unnormalized Form)**: Initial concept grouped Students, Enrollments, and Courses into one large spreadsheet-like table, causing repeating groups.
+- **1NF**: Separated composite attributes and repeating groups. Each row has atomic values and a unique identifier.
+- **2NF**: Removed Partial Dependencies. (e.g., `course_name` depends on `course_id`, not the composite PK of an Enrollment). Extracted to `Courses` table.
+- **3NF**: Removed Transitive Dependencies. (e.g., `Student -> Department -> Department_Location`). Department details are stored in `Departments`.
+- **BCNF**: Ensured that for every functional dependency X → Y, X is a superkey. The `Enrollments` table `(student_id, section_id)` uniquely identifies an enrollment, and neither part can determine the other.
 
-## DBMS Concepts Implemented
+### 4. Concurrency Control
+PostgreSQL handles multiple simultaneous transactions. We provide a script `concurrency_demo.py` to explicitly demonstrate:
+- **Row-Level Locking**: `SELECT ... FOR UPDATE` prevents two faculty members from marking attendance for the exact same student simultaneously.
+- **Deadlock Detection**: If two threads attempt conflicting updates, PostgreSQL's deadlock detector rolls back one transaction, which we catch and recover using `SAVEPOINT`.
 
-| Concept | Implementation | File |
-|---|---|---|
-| ER Diagram | 16-entity ERD with relationships | `database/erd_diagram.html` |
-| DDL | CREATE / DROP TABLE, CREATE INDEX | `schema.sql` |
-| DML | INSERT / UPDATE / DELETE / SELECT | `seed.sql`, service files |
-| Constraints | PK, FK, UNIQUE, CHECK, NOT NULL, DEFAULT | `schema.sql` |
-| Joins | INNER JOIN, LEFT JOIN, implicit cross join | `views.sql`, service files |
-| Views | 5 views including view-on-view | `views.sql` |
-| Stored Procedure | `mark_attendance` with UPSERT logic | `procedures.sql` |
-| Function | `calculate_attendance_percentage` | `procedures.sql` |
-| **Cursor** | `notify_low_attendance_students` — OPEN/FETCH/CLOSE loop | `procedures.sql` |
-| Triggers | Duplicate guard + Audit log (BEFORE/AFTER) | `triggers.sql` |
-| Subqueries | Scalar, correlated, derived-table style | `seed.sql`, `admin_service.py` |
-| **HAVING** | `high_enrolment_sections`, `dept_low_avg_attendance` | `views.sql` |
-| Indexes | 7 performance indexes on FK columns | `schema.sql` |
-| Transactions | `BEGIN; … COMMIT;` wraps full reset | `master_reset.sql` |
-| Aggregate Functions | COUNT, AVG, ROUND, COALESCE | Throughout |
-| Normalization | 1NF + 2NF + 3NF + BCNF | See section above |
+### 5. Query Optimization
+We added **Composite Indexes** (`idx_sa_composite`) and foreign key indexes. Run `query_optimization_demo.py` to view the PostgreSQL `EXPLAIN ANALYZE` output. It proves the shift from slow **Sequential Scans (Seq Scan)** to rapid **Index Scans** for large dataset aggregations.
+
+### 6. Backup & Restore
+To backup the database using `pg_dump`:
+```bash
+pg_dump -U postgres -d attendify -F c -f attendify_backup.dump
+```
+To restore it to a fresh instance:
+```bash
+pg_restore -U postgres -d attendify -1 attendify_backup.dump
+```
+
+## Authors
+- Developed as a Final Year University DBMS Project.

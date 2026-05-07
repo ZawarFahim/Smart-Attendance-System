@@ -1,4 +1,2 @@
-psycopg2-binary==2.9.9
-pandas>=2.0.0
-matplotlib>=3.7.0
+psycopg2-binary>=2.9.12
 sv-ttk>=2.0.0
