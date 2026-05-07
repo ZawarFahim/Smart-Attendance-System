@@ -232,3 +232,15 @@ CREATE TABLE AttendanceEditAudit (
     changed_by INTEGER,
     change_source VARCHAR(30) NOT NULL DEFAULT 'trigger'
 );
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- FEATURE 4: STUDENT PROFILE IMAGES (3NF)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE StudentProfileImages (
+    image_id SERIAL PRIMARY KEY,
+    student_id INTEGER NOT NULL UNIQUE,
+    image_name VARCHAR(255) NOT NULL,
+    image_path TEXT NOT NULL,
+    upload_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

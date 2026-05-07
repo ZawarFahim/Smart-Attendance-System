@@ -47,6 +47,8 @@ from services.report_service import (
     get_student_prerequisite_status
 )
 from services.attendance_service import archive_attendance_for_semester
+from services.backup_service import backup_postgres_to_firebase, restore_firebase_to_postgres
+
 class AdminDashboard(BaseDashboard):
     def __init__(self, user_info, on_logout=None):
         super().__init__("Admin Panel", user_info, on_logout)
@@ -62,6 +64,7 @@ class AdminDashboard(BaseDashboard):
         self.add_menu_item("Analytics", self.show_analytics)
         self.add_menu_item("Attendance Archive", self.show_archive)
         self.add_menu_item("Broadcast", self.show_broadcast)
+        self.add_menu_item("Firebase Sync", self.show_firebase_sync)
         
         # Default view
         self.show_overview()
@@ -1089,5 +1092,39 @@ class AdminDashboard(BaseDashboard):
 
             ttk.Button(control, text="Archive Attendance", style="Accent.TButton", command=do_archive)\
                 .grid(row=0, column=4, rowspan=2, padx=(12, 0), sticky='e')
+
+        self.switch_view(view)
+
+    def show_firebase_sync(self):
+        def view():
+            ttk.Label(self.content_frame, text="Firebase Synchronization", style="PageTitle.TLabel").pack(pady=(24, 16))
+            
+            card = ttk.Frame(self.content_frame, style="Card.TFrame", padding=20)
+            card.pack(fill='x', padx=20, pady=10)
+            
+            ttk.Label(card, text="PostgreSQL ↔ Firebase Sync", style="CardHeader.TLabel").pack(anchor='w', pady=(0, 10))
+            ttk.Label(card, text="Use these tools to backup your entire PostgreSQL database to Firebase Firestore, or restore from Firestore to PostgreSQL. Note: Firebase must be properly configured.", style="CardBody.TLabel", wraplength=600).pack(anchor='w', pady=(0, 20))
+            
+            btn_frame = ttk.Frame(card, style="Card.TFrame")
+            btn_frame.pack(fill='x')
+            
+            def do_backup():
+                if messagebox.askyesno("Confirm Backup", "This will upload all PostgreSQL records to Firebase. Depending on database size, this may take a moment. Proceed?"):
+                    try:
+                        count = backup_postgres_to_firebase()
+                        messagebox.showinfo("Backup Complete", f"Successfully synced {count} records to Firebase.")
+                    except Exception as e:
+                        messagebox.showerror("Backup Failed", f"An error occurred: {str(e)}")
+                        
+            def do_restore():
+                if messagebox.askyesno("Confirm Restore", "This will download all records from Firebase and insert them into PostgreSQL (duplicates ignored). Proceed?"):
+                    try:
+                        count = restore_firebase_to_postgres()
+                        messagebox.showinfo("Restore Complete", f"Successfully restored {count} records to PostgreSQL.")
+                    except Exception as e:
+                        messagebox.showerror("Restore Failed", f"An error occurred: {str(e)}")
+            
+            ttk.Button(btn_frame, text="Backup to Firebase", style="Accent.TButton", command=do_backup).pack(side='left', padx=(0, 10))
+            ttk.Button(btn_frame, text="Restore from Firebase", command=do_restore).pack(side='left')
 
         self.switch_view(view)

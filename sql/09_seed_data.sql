@@ -3,17 +3,23 @@
 -- Run this AFTER database/schema.sql
 -- ==================================================
 
+-- First, remove all existing data so the script can be run multiple times safely
+TRUNCATE Departments, Users, Courses, Rooms, AttendanceStatus, CourseResultStatuses, AttendancePolicies CASCADE;
+
+
 INSERT INTO Departments (dept_name) VALUES
     ('Computer Science'),
     ('Information Technology'),
-    ('Mathematics');
+    ('Mathematics')
+ON CONFLICT (dept_name) DO NOTHING;
 
 -- Users seeded with plaintext passwords (project convention)
 INSERT INTO Users (username, email, password_hash, role) VALUES
     ('admin1', 'admin@attendify.edu',    'admin123', 'Admin'),
     ('fac1',   'faculty1@attendify.edu', 'fac123',   'Faculty'),
     ('stud1',  'student1@attendify.edu', 'stud123',  'Student'),
-    ('stud2',  'student2@attendify.edu', 'stud222',  'Student');
+    ('stud2',  'student2@attendify.edu', 'stud222',  'Student')
+ON CONFLICT (username) DO NOTHING;
 
 -- Use subqueries so IDs are never hardcoded
 INSERT INTO Students (student_id, first_name, last_name, dept_id)

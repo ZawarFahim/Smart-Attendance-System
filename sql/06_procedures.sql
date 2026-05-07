@@ -92,9 +92,9 @@ $$;
 
 CREATE OR REPLACE PROCEDURE grant_attendance_edit_override(
     p_session_id INT,
-    p_student_id INT DEFAULT NULL,
     p_granted_by INT,
     p_reason TEXT,
+    p_student_id INT DEFAULT NULL,
     p_valid_until TIMESTAMP DEFAULT NULL
 )
 LANGUAGE plpgsql
@@ -179,5 +179,27 @@ BEGIN
     DELETE FROM AttendanceSessions sess
     USING tmp_session_map m
     WHERE sess.session_id = m.original_session_id;
+END;
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- FEATURE 4: UPSERT PROFILE IMAGE
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE upsert_student_profile_image(
+    p_student_id INT,
+    p_image_name VARCHAR,
+    p_image_path TEXT
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    INSERT INTO StudentProfileImages (student_id, image_name, image_path, upload_timestamp)
+    VALUES (p_student_id, p_image_name, p_image_path, CURRENT_TIMESTAMP)
+    ON CONFLICT (student_id)
+    DO UPDATE SET
+        image_name = EXCLUDED.image_name,
+        image_path = EXCLUDED.image_path,
+        upload_timestamp = CURRENT_TIMESTAMP;
 END;
 $$;

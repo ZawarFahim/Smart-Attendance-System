@@ -329,4 +329,29 @@ You can use the following textual flows as a basis for diagrams in your project 
 - **Attendance Archive Flow**:  
   Admin Dashboard → *Attendance Archive* → call `archive_attendance_for_semester` → rows moved from `AttendanceSessions`/`StudentAttendance` to archive tables → history consumed via `student_attendance_history_all` in Student/Faculty dashboards.
 
+### E. Firebase Backup & Restore Integration
+
+**Configuration**:
+- The project integrates `firebase-admin` and `python-dotenv`.
+- Place your `serviceAccountKey.json` inside `config/firebase/` (refer to `firebase_config.json.example`).
+- Create a `.env` file based on `.env.example` to define the credentials path.
+
+**Capabilities**:
+- Admin Dashboard -> *Firebase Sync*
+- **Backup**: Syncs all essential PostgreSQL tables to Firestore collections, properly mirroring the schemas.
+- **Restore**: Pulls documents from Firestore and inserts them back into PostgreSQL using `ON CONFLICT DO NOTHING` to prevent duplicates.
+- All errors are captured and reported safely without crashing the UI.
+
+### F. Student Profile Image Storage (3NF)
+
+**Database design**
+- `StudentProfileImages(image_id, student_id, image_name, image_path, upload_timestamp)`
+- Ensures 3NF compliance (each image explicitly depends on the `image_id` PK, with a unique FK to `student_id` for 1:1 mapping).
+- Stored Procedure: `upsert_student_profile_image(student_id, image_name, image_path)` uses PostgreSQL's `ON CONFLICT DO UPDATE` to gracefully handle new uploads or replacements.
+
+**Functionality**:
+- Images are saved locally inside `uploads/student_profiles/`.
+- Pillow (`PIL`) is used to automatically resize large profile images to maximum 500x500 pixels.
+- The Student Dashboard now features a *My Profile* tab allowing students to upload and view their profile images.
+
 
