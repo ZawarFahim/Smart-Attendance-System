@@ -26,13 +26,27 @@ from services.user_service import (
     delete_timetable_entry,
     get_admin_overview_counts,
     get_all_departments,
-    get_audit_logs
+    get_audit_logs,
+    get_all_enrollments,
+    add_enrollment,
+    get_eligible_sections_for_student
 )
 from services.user_service import get_all_leave_requests, review_leave_request
 from services.user_service import create_notification, broadcast_notification
 from tkinter import filedialog
-from services.report_service import get_overall_attendance_stats, get_department_attendance_rates
-from services.report_service import export_attendance_to_csv, get_faculty_workload_report, get_department_ranking, get_student_trends
+from services.report_service import (
+    get_overall_attendance_stats,
+    get_department_attendance_rates,
+    export_attendance_to_csv,
+    get_faculty_workload_report,
+    get_faculty_workload_semester_summary,
+    get_faculty_monthly_sessions,
+    get_department_ranking,
+    get_student_trends,
+    get_course_prerequisite_map,
+    get_student_prerequisite_status
+)
+from services.attendance_service import archive_attendance_for_semester
 class AdminDashboard(BaseDashboard):
     def __init__(self, user_info, on_logout=None):
         super().__init__("Admin Panel", user_info, on_logout)
@@ -42,9 +56,11 @@ class AdminDashboard(BaseDashboard):
         self.add_menu_item("Manage Students", self.show_manage_students)
         self.add_menu_item("Manage Faculty", self.show_manage_faculty)
         self.add_menu_item("Academic Setup", self.show_academic_setup)
+        self.add_menu_item("Prereqs & Enrollment", self.show_prerequisites)
         self.add_menu_item("Leave Requests", self.show_leave_requests)
         self.add_menu_item("Audit Logs", self.show_audit_logs)
         self.add_menu_item("Analytics", self.show_analytics)
+        self.add_menu_item("Attendance Archive", self.show_archive)
         self.add_menu_item("Broadcast", self.show_broadcast)
         
         # Default view
@@ -178,6 +194,83 @@ class AdminDashboard(BaseDashboard):
             self._build_room_tab(room_tab)
             self._build_section_tab(section_tab)
             self._build_timetable_tab(timetable_tab)
+        self.switch_view(view)
+
+    def show_prerequisites(self):
+        def view():
+            ttk.Label(self.content_frame, text="Prerequisites & Enrollment", style="PageTitle.TLabel").pack(pady=(24, 12))
+
+            notebook = ttk.Notebook(self.content_frame)
+            notebook.pack(expand=True, fill='both', padx=16, pady=10)
+
+            # Tab 1: Course Prerequisite Map
+            tab_map = ttk.Frame(notebook, style="Content.TFrame")
+            notebook.add(tab_map, text="Course Prerequisite Map")
+            cols_map = ("Course Code", "Course Name", "Prereq Code", "Prereq Name")
+            tree_map = self._build_table(tab_map, cols_map)
+            for row in get_course_prerequisite_map():
+                tree_map.insert("", "end", values=(
+                    row['course_code'],
+                    row['course_name'],
+                    row['prereq_course_code'],
+                    row['prereq_course_name'],
+                ))
+
+            # Tab 2: Manage Enrollments (with prerequisite enforcement)
+            tab_enroll = ttk.Frame(notebook, style="Content.TFrame")
+            notebook.add(tab_enroll, text="Enrollments")
+
+            top_frame = ttk.Frame(tab_enroll, style="Card.TFrame", padding=12)
+            top_frame.pack(fill='x', padx=16, pady=(10, 5))
+
+            ttk.Label(top_frame, text="Student ID", style="CardBody.TLabel").grid(row=0, column=0, sticky='w')
+            student_entry = ttk.Entry(top_frame, font=FONTS['body'])
+            student_entry.grid(row=0, column=1, sticky='ew', padx=(8, 16))
+
+            ttk.Label(top_frame, text="Section ID", style="CardBody.TLabel").grid(row=0, column=2, sticky='w')
+            section_entry = ttk.Entry(top_frame, font=FONTS['body'])
+            section_entry.grid(row=0, column=3, sticky='ew', padx=(8, 0))
+
+            top_frame.grid_columnconfigure(1, weight=1)
+            top_frame.grid_columnconfigure(3, weight=1)
+
+            def handle_enroll():
+                sid = student_entry.get().strip()
+                sec = section_entry.get().strip()
+                if not sid or not sec:
+                    messagebox.showerror("Validation Error", "Provide both Student ID and Section ID.")
+                    return
+                if not sid.isdigit() or not sec.isdigit():
+                    messagebox.showerror("Validation Error", "IDs must be numeric.")
+                    return
+                if add_enrollment(int(sid), int(sec)):
+                    messagebox.showinfo("Success", "Enrollment created successfully (prerequisites validated in database).")
+                    load_enrollments()
+                else:
+                    messagebox.showerror(
+                        "Enrollment Failed",
+                        "Could not enroll student. Check prerequisites, uniqueness, and IDs."
+                    )
+
+            ttk.Button(top_frame, text="Enroll Student", style="Accent.TButton", command=handle_enroll)\
+                .grid(row=0, column=4, padx=(12, 0))
+
+            columns = ("Enrollment ID", "Student", "Course Code", "Course Name", "Semester")
+            tree_enroll = self._build_table(tab_enroll, columns)
+
+            def load_enrollments():
+                tree_enroll.delete(*tree_enroll.get_children())
+                for row in get_all_enrollments():
+                    tree_enroll.insert("", "end", values=(
+                        row['enrollment_id'],
+                        row['student_name'],
+                        row['course_code'],
+                        row['course_name'],
+                        row['semester'],
+                    ))
+
+            load_enrollments()
+
         self.switch_view(view)
 
     def _build_course_tab(self, parent):
@@ -845,12 +938,64 @@ class AdminDashboard(BaseDashboard):
             # Tab 1: Faculty Workload (Ranked)
             tab_workload = ttk.Frame(notebook, style="Content.TFrame")
             notebook.add(tab_workload, text="Faculty Workload (Ranked)")
-            cols_workload = ("Faculty ID", "First Name", "Last Name", "Total Sections", "Total Credits", "Workload Rank")
+            cols_workload = ("Faculty ID", "First Name", "Last Name", "Total Sections", "Total Credits", "Weekly Hours", "Weekly Slots", "Workload Rank")
             tree_workload = self._build_table(tab_workload, cols_workload)
             for row in get_faculty_workload_report():
-                tree_workload.insert("", "end", values=(row['faculty_id'], row['first_name'], row['last_name'], row['total_sections'], row['total_credits'], row['workload_rank']))
+                tree_workload.insert(
+                    "",
+                    "end",
+                    values=(
+                        row['faculty_id'],
+                        row['first_name'],
+                        row['last_name'],
+                        row['total_sections'],
+                        row['total_credits'],
+                        f"{row['weekly_teaching_hours']:.2f}",
+                        row['weekly_class_slots'],
+                        row['workload_rank'],
+                    ),
+                )
 
-            # Tab 2: Department Rankings
+            # Tab 2: Semester Workload Summary
+            tab_sem = ttk.Frame(notebook, style="Content.TFrame")
+            notebook.add(tab_sem, text="Workload by Semester")
+            cols_sem = ("Faculty ID", "First Name", "Last Name", "Semester", "Year", "Sections", "Courses", "Weekly Hours", "Weekly Slots")
+            tree_sem = self._build_table(tab_sem, cols_sem)
+            for row in get_faculty_workload_semester_summary():
+                tree_sem.insert(
+                    "",
+                    "end",
+                    values=(
+                        row['faculty_id'],
+                        row['first_name'],
+                        row['last_name'],
+                        row['semester'],
+                        row['academic_year'],
+                        row['total_sections'],
+                        row['total_courses'],
+                        f"{row['weekly_teaching_hours']:.2f}",
+                        row['weekly_class_slots'],
+                    ),
+                )
+
+            # Tab 3: Monthly Sessions
+            tab_month = ttk.Frame(notebook, style="Content.TFrame")
+            notebook.add(tab_month, text="Monthly Faculty Sessions")
+            cols_month = ("Faculty ID", "Month Start", "Total Sessions", "Distinct Sections")
+            tree_month = self._build_table(tab_month, cols_month)
+            for row in get_faculty_monthly_sessions():
+                tree_month.insert(
+                    "",
+                    "end",
+                    values=(
+                        row['faculty_id'],
+                        row['month_start'],
+                        row['total_sessions_created'],
+                        row['distinct_sections'],
+                    ),
+                )
+
+            # Tab 4: Department Rankings
             tab_dept = ttk.Frame(notebook, style="Content.TFrame")
             notebook.add(tab_dept, text="Department Attendance Rankings")
             cols_dept = ("Department", "Course Code", "Course Name", "Total Records", "Present Count", "Percentage", "Rank in Dept")
@@ -858,7 +1003,7 @@ class AdminDashboard(BaseDashboard):
             for row in get_department_ranking():
                 tree_dept.insert("", "end", values=(row['dept_name'], row['course_code'], row['course_name'], row['total_attendance_records'], row['total_present'], f"{row['dept_course_attendance_percentage']:.2f}%", row['rank_in_dept']))
 
-            # Tab 3: Student Attendance Trends
+            # Tab 5: Student Attendance Trends
             tab_trends = ttk.Frame(notebook, style="Content.TFrame")
             notebook.add(tab_trends, text="Student Attendance Trends (LAG)")
             cols_trends = ("Student ID", "Section ID", "Session Date", "Current Status", "Previous Status")
@@ -902,5 +1047,47 @@ class AdminDashboard(BaseDashboard):
                         messagebox.showerror("Error", "Failed to send broadcast.")
             
             ttk.Button(form, text="Send Broadcast", style="Accent.TButton", command=send_broadcast).pack(anchor='e')
+
+        self.switch_view(view)
+
+    def show_archive(self):
+        def view():
+            ttk.Label(self.content_frame, text="Attendance Archive & Freeze", style="PageTitle.TLabel").pack(pady=(24, 16))
+
+            control = ttk.Frame(self.content_frame, style="Card.TFrame", padding=16)
+            control.pack(fill='x', padx=20, pady=(0, 16))
+
+            ttk.Label(control, text="Semester", style="CardBody.TLabel").grid(row=0, column=0, sticky='w')
+            semester_combo = ttk.Combobox(control, values=["Spring", "Summer", "Fall", "Winter"], state='readonly', font=FONTS['body'])
+            semester_combo.grid(row=0, column=1, sticky='w', padx=(8, 24))
+            semester_combo.set("Fall")
+
+            ttk.Label(control, text="Academic Year", style="CardBody.TLabel").grid(row=0, column=2, sticky='w')
+            year_entry = ttk.Entry(control, font=FONTS['body'])
+            year_entry.grid(row=0, column=3, sticky='w', padx=(8, 24))
+            year_entry.insert(0, "2026-2027")
+
+            ttk.Label(control, text="Reason", style="CardBody.TLabel").grid(row=1, column=0, sticky='w', pady=(8, 0))
+            reason_entry = ttk.Entry(control, font=FONTS['body'])
+            reason_entry.grid(row=1, column=1, columnspan=3, sticky='ew', padx=(8, 0), pady=(8, 0))
+
+            control.grid_columnconfigure(3, weight=1)
+
+            def do_archive():
+                sem = semester_combo.get().strip()
+                year = year_entry.get().strip()
+                reason = reason_entry.get().strip()
+                if not sem or not year:
+                    messagebox.showerror("Validation Error", "Semester and Academic Year are required.")
+                    return
+                if not messagebox.askyesno("Confirm Archive", f"Archive attendance for {sem} {year}?"):
+                    return
+                if archive_attendance_for_semester(sem, year, self.user_info['user_id'], reason):
+                    messagebox.showinfo("Success", "Archive operation completed.")
+                else:
+                    messagebox.showerror("Error", "Failed to archive attendance. See server logs for details.")
+
+            ttk.Button(control, text="Archive Attendance", style="Accent.TButton", command=do_archive)\
+                .grid(row=0, column=4, rowspan=2, padx=(12, 0), sticky='e')
 
         self.switch_view(view)

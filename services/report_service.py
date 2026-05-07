@@ -23,6 +23,18 @@ def get_faculty_workload_report():
     query = "SELECT * FROM faculty_workload_report"
     return fetch_all(query)
 
+
+def get_faculty_workload_semester_summary():
+    """Fetches semester-based workload summary per faculty."""
+    query = "SELECT * FROM faculty_workload_semester_summary"
+    return fetch_all(query)
+
+
+def get_faculty_monthly_sessions():
+    """Fetches monthly class sessions per faculty."""
+    query = "SELECT * FROM faculty_monthly_class_sessions_summary"
+    return fetch_all(query)
+
 def get_department_ranking():
     """Fetches department attendance ranking using window functions."""
     query = "SELECT * FROM department_attendance_ranking"
@@ -70,6 +82,47 @@ def get_department_attendance_rates():
         HAVING COUNT(sa.attendance_id) > 0
     """
     return fetch_all(query)
+
+
+# ─── PREREQUISITE / ENROLLMENT REPORTS ────────────────────────────────────────
+
+def get_course_prerequisite_map():
+    """Return mapping of courses to their prerequisite courses."""
+    query = "SELECT * FROM course_prerequisite_map ORDER BY course_code, prereq_course_code"
+    return fetch_all(query)
+
+
+def get_student_prerequisite_status(student_id: int):
+    """Return prerequisite completion/eligibility per course for a given student."""
+    query = """
+        SELECT *
+        FROM student_course_prerequisite_status
+        WHERE student_id = %s
+        ORDER BY course_code
+    """
+    return fetch_all(query, (student_id,))
+
+
+def get_eligible_sections_for_student(student_id: int):
+    """Return sections the student is currently eligible to enroll in."""
+    query = """
+        SELECT *
+        FROM eligible_sections_for_student
+        WHERE student_id = %s
+        ORDER BY course_code, semester, academic_year
+    """
+    return fetch_all(query, (student_id,))
+
+
+def get_blocked_enrollments_for_student(student_id: int):
+    """Return sections blocked by unmet prerequisites for a given student."""
+    query = """
+        SELECT *
+        FROM blocked_enrollments_for_student
+        WHERE student_id = %s
+        ORDER BY course_code, semester, academic_year
+    """
+    return fetch_all(query, (student_id,))
 
 
 import csv

@@ -9,6 +9,9 @@ A comprehensive, modular University Database Management System (DBMS) project. T
 - **Timetable Scheduling**: Handle weekly schedules and exam timetables with clash detection.
 - **Leave Management**: Review and approve/reject leave requests.
 - **System Audit Logging**: Track database insertions, updates, and deletions using database triggers.
+- **Prerequisite-Aware Enrollment**: Enforce multi-course prerequisite chains with normalized tables, views, and triggers.
+- **Faculty Workload Analyzer**: Compute ranked workload, weekly teaching hours, semester summaries, and monthly sessions.
+- **Attendance Freeze & Archive**: Time-based freeze policy, override support, archival of old semesters, and unified history views.
 
 ## Technologies Used
 - **Language**: Python 3.10+
@@ -171,6 +174,19 @@ The database was designed to prevent Insert, Update, and Delete anomalies:
 - **2NF**: Removed Partial Dependencies. (e.g., `course_name` depends on `course_id`, not the composite PK of an Enrollment). Extracted to `Courses` table.
 - **3NF**: Removed Transitive Dependencies. (e.g., `Student -> Department -> Department_Location`). Department details are stored in `Departments`.
 - **BCNF**: Ensured that for every functional dependency X → Y, X is a superkey. The `Enrollments` table `(student_id, section_id)` uniquely identifies an enrollment, and neither part can determine the other.
+  
+Additional tables introduced for the advanced features also satisfy 3NF / BCNF:
+
+- **CoursePrerequisites(course_id, prereq_course_id)**  
+  - Composite primary key; the only functional dependency is the key itself.
+- **CourseResultStatuses(status_code, status_name, is_passing)**  
+  - `status_code → status_name, is_passing`; `status_code` is the primary key.
+- **StudentCourseResults(student_id, course_id, status_code, recorded_at, recorded_by, notes)**  
+  - `(student_id, course_id) → status_code, recorded_at, recorded_by, notes`; all non-key attributes depend on the whole key.
+- **AttendancePolicies(policy_id, freeze_minutes, archive_after_days, updated_at)**  
+  - `policy_id → freeze_minutes, archive_after_days, updated_at`; singleton-like but still normalized.
+- **AttendanceSessionsArchive / StudentAttendanceArchive / AttendanceEditAudit**  
+  - Each has a single-column surrogate key; all descriptive attributes depend on that key only, while reference data (courses, students, statuses) remains normalized into parent tables.
 
 ### 4. Concurrency Control
 PostgreSQL handles multiple simultaneous transactions. We provide a script `concurrency_demo.py` to explicitly demonstrate:
@@ -192,3 +208,130 @@ pg_restore -U postgres -d attendify -1 attendify_backup.dump
 
 ## Authors
 - Developed as a Final Year University DBMS Project.
+
+---
+
+## New Feature Walkthroughs
+
+### A. Prerequisite Course Enrollment System
+
+**Database design**
+
+- `CoursePrerequisites` captures many-to-many course dependencies.
+- `CourseResultStatuses` and `StudentCourseResults` record course-level outcomes per student.
+- A trigger (`trg_validate_prereq_enrollment`) ensures that an `INSERT` into `Enrollments` is rejected if required prerequisites are not completed.
+- Stored procedures:
+  - `enroll_student_in_section(student_id, section_id)`
+  - `record_student_course_result(student_id, course_id, status_code, recorded_by, notes)`
+- Views:
+  - `course_prerequisite_map`
+  - `student_course_prerequisite_status`
+  - `eligible_sections_for_student`
+  - `blocked_enrollments_for_student`
+
+**Service layer**
+
+- `services/user_service.py`:
+  - `add_enrollment` now calls `CALL enroll_student_in_section` for transaction-safe, trigger-validated enrollment.
+  - `get_eligible_sections_for_student(student_id)` reads from the eligibility view.
+- `services/report_service.py`:
+  - `get_course_prerequisite_map()`
+  - `get_student_prerequisite_status(student_id)`
+  - `get_eligible_sections_for_student(student_id)`
+  - `get_blocked_enrollments_for_student(student_id)`
+
+**GUI**
+
+- **Admin Dashboard** → **Prereqs & Enrollment**:
+  - Tab *Course Prerequisite Map*: lists each course and its prerequisites.
+  - Tab *Enrollments*: searchable table of enrollments plus a small form (`Student ID`, `Section ID`) that uses the stored procedure for enrollment; blocked enrollments (due to missing prerequisites) are surfaced as validation errors.
+- **Student Dashboard** → **Course Eligibility**:
+  - Tab *Prerequisite Status*: shows, per course, the number of prerequisites, how many are completed, and whether the student is currently eligible.
+  - Tab *Eligible Sections*: lists sections the student can safely enroll in (all prerequisites satisfied).
+  - Tab *Blocked Enrollments*: lists sections blocked, along with a comma-separated list of missing prerequisite course codes.
+
+The entire flow is transaction-safe and enforced at the database level, demonstrating the use of triggers, procedures, views, subqueries, and aggregate queries.
+
+### B. Faculty Workload Analyzer
+
+**Database design**
+
+- View `faculty_workload_report` extended to include:
+  - `weekly_teaching_hours`
+  - `weekly_class_slots`
+  - Window function `RANK()` for ranking by total credits.
+- New views:
+  - `faculty_workload_semester_summary` (per faculty, per semester/year).
+  - `faculty_monthly_class_sessions_summary` (per faculty, per calendar month).
+
+**Service layer**
+
+- `services/report_service.py`:
+  - `get_faculty_workload_report()`
+  - `get_faculty_workload_semester_summary()`
+  - `get_faculty_monthly_sessions()`
+
+**GUI**
+
+- **Admin Dashboard** → **Analytics**:
+  - Tab *Faculty Workload (Ranked)*: enhanced table including weekly hours and class slots.
+  - Tab *Workload by Semester*: workload summary per faculty and semester.
+  - Tab *Monthly Faculty Sessions*: monthly class sessions per faculty.
+- **Faculty Dashboard** → **My Workload**:
+  - Tab *Overall Workload*: shows the logged-in faculty member’s total sections, credits, weekly hours, slots, and rank.
+  - Tab *By Semester*: their workload split by semester.
+  - Tab *Monthly Sessions*: how many sessions they created each month and across how many sections.
+
+These pages make heavy use of `GROUP BY`, `HAVING`, window functions, and optimized JOINs with composite indexes.
+
+### C. Attendance Freeze & Archive System
+
+**Database design**
+
+- `AttendancePolicies(policy_id, freeze_minutes, archive_after_days)` controls:
+  - How long after a session’s end time attendance editing is allowed.
+  - When old semesters should be archived.
+- `AttendanceEditOverrides` allows admins to grant session- or student-specific overrides.
+- `AttendanceSessionsArchive` and `StudentAttendanceArchive` store historical snapshots of sessions and attendance.
+- `AttendanceEditAudit` records post-freeze edits (who changed what and when).
+- Triggers:
+  - `trg_attendance_freeze_guard` (via `enforce_attendance_freeze`) blocks edits past the freeze deadline unless an override exists.
+  - `trg_audit_student_attendance_update` records every status/remark change after the fact.
+- Procedure:
+  - `archive_attendance_for_semester(semester, academic_year, archived_by, reason)` moves data into the archive tables within a transaction.
+- Unified history view:
+  - `student_attendance_history_all` returns both current and archived rows with a `source` flag.
+
+**Service layer**
+
+- `services/attendance_service.py`:
+  - `get_attendance_history_all(student_id)` aggregates current + archived history.
+  - `archive_attendance_for_semester(semester, academic_year, archived_by, reason)` calls the stored procedure.
+
+**GUI**
+
+- **Admin Dashboard** → **Attendance Archive**:
+  - Simple form to select `Semester`, `Academic Year`, and an optional `Reason`.
+  - Button *Archive Attendance* calls `archive_attendance_for_semester` and shows success/failure.
+- **Faculty Dashboard**:
+  - `Mark Attendance` now warns that failed saves may be caused by the freeze policy.
+  - `My Workload` and `Session History` help faculty understand their teaching load over time.
+- **Student Dashboard**:
+  - `My Attendance` now uses `get_attendance_history_all`, showing whether each row came from the *current* or *archive* tables.
+
+This subsystem demonstrates transactions, triggers, procedures, archive tables, and temporal data management in PostgreSQL.
+
+### D. Flowcharts & ERD (for your report)
+
+You can use the following textual flows as a basis for diagrams in your project report:
+
+- **Enrollment Flow**:  
+  Student Dashboard → *Course Eligibility* → choose section → Admin Dashboard / backend calls `enroll_student_in_section` → DB trigger `validate_prerequisites_for_enrollment` → either INSERT into `Enrollments` or error with missing prerequisites.
+
+- **Workload Flow**:  
+  Faculty / Sections / Timetable / AttendanceSessions → PostgreSQL views (`faculty_workload_report`, `faculty_workload_semester_summary`, `faculty_monthly_class_sessions_summary`) → `report_service` → Admin and Faculty dashboards.
+
+- **Attendance Archive Flow**:  
+  Admin Dashboard → *Attendance Archive* → call `archive_attendance_for_semester` → rows moved from `AttendanceSessions`/`StudentAttendance` to archive tables → history consumed via `student_attendance_history_all` in Student/Faculty dashboards.
+
+These flows can be rendered as standard UML activity diagrams or simple flowcharts in your `Report.docx`, referencing the underlying SQL objects described above.

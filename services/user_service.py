@@ -167,12 +167,31 @@ def get_all_enrollments():
     return fetch_all(query)
 
 def add_enrollment(student_id, section_id):
-    """Enroll a student in a section."""
-    return execute_query("INSERT INTO Enrollments (student_id, section_id) VALUES (%s, %s)", (student_id, section_id))
+    """
+    Enroll a student in a section.
+    Uses the stored procedure enroll_student_in_section so that
+    prerequisite validation and uniqueness are enforced at the DB level.
+    """
+    query = "CALL enroll_student_in_section(%s, %s)"
+    return execute_query(query, (student_id, section_id))
 
 def delete_enrollment(enrollment_id):
     """Remove an enrollment."""
     return execute_query("DELETE FROM Enrollments WHERE enrollment_id = %s", (enrollment_id,))
+
+
+def get_eligible_sections_for_student(student_id: int):
+    """
+    Helper to fetch sections the student is eligible to enroll in,
+    backed by the eligible_sections_for_student view.
+    """
+    query = """
+        SELECT *
+        FROM eligible_sections_for_student
+        WHERE student_id = %s
+        ORDER BY course_code, semester, academic_year
+    """
+    return fetch_all(query, (student_id,))
 
 # ─── AUDIT LOGS ──────────────────────────────────────────────────────────────
 

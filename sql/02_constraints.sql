@@ -55,3 +55,103 @@ ALTER TABLE LeaveRequests ADD CONSTRAINT chk_leave_status CHECK (status IN ('Pen
 ALTER TABLE Notifications ADD CONSTRAINT fk_notif_user FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE;
 
 ALTER TABLE AuditLogs ADD CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE SET NULL;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- FEATURE 1: PREREQUISITES + COURSE COMPLETION
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE CoursePrerequisites
+    ADD CONSTRAINT fk_prereq_course
+    FOREIGN KEY (course_id) REFERENCES Courses(course_id) ON DELETE CASCADE;
+
+ALTER TABLE CoursePrerequisites
+    ADD CONSTRAINT fk_prereq_prereq_course
+    FOREIGN KEY (prereq_course_id) REFERENCES Courses(course_id) ON DELETE RESTRICT;
+
+ALTER TABLE CoursePrerequisites
+    ADD CONSTRAINT chk_prereq_not_self
+    CHECK (course_id <> prereq_course_id);
+
+ALTER TABLE StudentCourseResults
+    ADD CONSTRAINT fk_scr_student
+    FOREIGN KEY (student_id) REFERENCES Students(student_id) ON DELETE CASCADE;
+
+ALTER TABLE StudentCourseResults
+    ADD CONSTRAINT fk_scr_course
+    FOREIGN KEY (course_id) REFERENCES Courses(course_id) ON DELETE CASCADE;
+
+ALTER TABLE StudentCourseResults
+    ADD CONSTRAINT fk_scr_status
+    FOREIGN KEY (status_code) REFERENCES CourseResultStatuses(status_code) ON DELETE RESTRICT;
+
+ALTER TABLE StudentCourseResults
+    ADD CONSTRAINT fk_scr_recorded_by
+    FOREIGN KEY (recorded_by) REFERENCES Users(user_id) ON DELETE SET NULL;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- FEATURE 3: ATTENDANCE FREEZE + ARCHIVE + OVERRIDES
+-- ─────────────────────────────────────────────────────────────────────────────
+
+ALTER TABLE AttendancePolicies
+    ADD CONSTRAINT chk_policy_freeze_minutes
+    CHECK (freeze_minutes > 0);
+
+ALTER TABLE AttendancePolicies
+    ADD CONSTRAINT chk_policy_archive_days
+    CHECK (archive_after_days >= 0);
+
+ALTER TABLE AttendanceEditOverrides
+    ADD CONSTRAINT fk_aeo_session
+    FOREIGN KEY (session_id) REFERENCES AttendanceSessions(session_id) ON DELETE CASCADE;
+
+ALTER TABLE AttendanceEditOverrides
+    ADD CONSTRAINT fk_aeo_student
+    FOREIGN KEY (student_id) REFERENCES Students(student_id) ON DELETE CASCADE;
+
+ALTER TABLE AttendanceEditOverrides
+    ADD CONSTRAINT fk_aeo_granted_by
+    FOREIGN KEY (granted_by) REFERENCES Users(user_id) ON DELETE SET NULL;
+
+ALTER TABLE AttendanceEditAudit
+    ADD CONSTRAINT fk_audit_att_session
+    FOREIGN KEY (session_id) REFERENCES AttendanceSessions(session_id) ON DELETE CASCADE;
+
+ALTER TABLE AttendanceEditAudit
+    ADD CONSTRAINT fk_audit_att_student
+    FOREIGN KEY (student_id) REFERENCES Students(student_id) ON DELETE CASCADE;
+
+ALTER TABLE AttendanceEditAudit
+    ADD CONSTRAINT fk_audit_att_old_status
+    FOREIGN KEY (old_status_id) REFERENCES AttendanceStatus(status_id) ON DELETE SET NULL;
+
+ALTER TABLE AttendanceEditAudit
+    ADD CONSTRAINT fk_audit_att_new_status
+    FOREIGN KEY (new_status_id) REFERENCES AttendanceStatus(status_id) ON DELETE SET NULL;
+
+ALTER TABLE AttendanceEditAudit
+    ADD CONSTRAINT fk_audit_att_changed_by
+    FOREIGN KEY (changed_by) REFERENCES Users(user_id) ON DELETE SET NULL;
+
+ALTER TABLE AttendanceSessionsArchive
+    ADD CONSTRAINT fk_asa_section
+    FOREIGN KEY (section_id) REFERENCES Sections(section_id) ON DELETE RESTRICT;
+
+ALTER TABLE AttendanceSessionsArchive
+    ADD CONSTRAINT fk_asa_created_by
+    FOREIGN KEY (created_by) REFERENCES Faculty(faculty_id) ON DELETE SET NULL;
+
+ALTER TABLE AttendanceSessionsArchive
+    ADD CONSTRAINT fk_asa_archived_by
+    FOREIGN KEY (archived_by) REFERENCES Users(user_id) ON DELETE SET NULL;
+
+ALTER TABLE StudentAttendanceArchive
+    ADD CONSTRAINT fk_saa_archive_session
+    FOREIGN KEY (archive_session_id) REFERENCES AttendanceSessionsArchive(archive_session_id) ON DELETE CASCADE;
+
+ALTER TABLE StudentAttendanceArchive
+    ADD CONSTRAINT fk_saa_student
+    FOREIGN KEY (student_id) REFERENCES Students(student_id) ON DELETE CASCADE;
+
+ALTER TABLE StudentAttendanceArchive
+    ADD CONSTRAINT fk_saa_status
+    FOREIGN KEY (status_id) REFERENCES AttendanceStatus(status_id) ON DELETE RESTRICT;
