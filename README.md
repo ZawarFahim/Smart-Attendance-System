@@ -138,8 +138,6 @@ The `09_seed_data.sql` file creates sample users for testing out of the box.
   - Username: `stud1`
   - Password: `stud123`
 
-## Screenshots
-*(Insert screenshots of the Login, Admin Dashboard, and Attendance Pages here)*
 
 ## Academic Documentation
 
@@ -167,15 +165,15 @@ The application relies on SQL queries that map to core Relational Algebra concep
    - *SQL*: `SELECT student_id FROM Students EXCEPT SELECT student_id FROM Enrollments;`
    - *Algebra*: π<sub>student_id</sub>(Students) - π<sub>student_id</sub>(Enrollments)
 
-### 3. Normalization Proof (Up to BCNF)
+### 3. Normalization Proof (Up to 3NF)
 The database was designed to prevent Insert, Update, and Delete anomalies:
 - **UNF (Unnormalized Form)**: Initial concept grouped Students, Enrollments, and Courses into one large spreadsheet-like table, causing repeating groups.
 - **1NF**: Separated composite attributes and repeating groups. Each row has atomic values and a unique identifier.
 - **2NF**: Removed Partial Dependencies. (e.g., `course_name` depends on `course_id`, not the composite PK of an Enrollment). Extracted to `Courses` table.
 - **3NF**: Removed Transitive Dependencies. (e.g., `Student -> Department -> Department_Location`). Department details are stored in `Departments`.
-- **BCNF**: Ensured that for every functional dependency X → Y, X is a superkey. The `Enrollments` table `(student_id, section_id)` uniquely identifies an enrollment, and neither part can determine the other.
+
   
-Additional tables introduced for the advanced features also satisfy 3NF / BCNF:
+Additional tables introduced for the advanced features also satisfy 3NF:
 
 - **CoursePrerequisites(course_id, prereq_course_id)**  
   - Composite primary key; the only functional dependency is the key itself.
@@ -205,9 +203,6 @@ To restore it to a fresh instance:
 ```bash
 pg_restore -U postgres -d attendify -1 attendify_backup.dump
 ```
-
-## Authors
-- Developed as a Final Year University DBMS Project.
 
 ---
 
@@ -334,4 +329,4 @@ You can use the following textual flows as a basis for diagrams in your project 
 - **Attendance Archive Flow**:  
   Admin Dashboard → *Attendance Archive* → call `archive_attendance_for_semester` → rows moved from `AttendanceSessions`/`StudentAttendance` to archive tables → history consumed via `student_attendance_history_all` in Student/Faculty dashboards.
 
-These flows can be rendered as standard UML activity diagrams or simple flowcharts in your `Report.docx`, referencing the underlying SQL objects described above.
+
