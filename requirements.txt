@@ -1,2 +1,4 @@
 psycopg2-binary>=2.9.12
 sv-ttk>=2.0.0
+bcrypt>=4.0.0
+openpyxl>=3.1.0

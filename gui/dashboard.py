@@ -56,8 +56,10 @@ class BaseDashboard(tk.Tk):
 
     def _build_sidebar_header(self):
         """Header with User Info."""
+        # Prefer display_name (full name fetched at login) over raw username
+        display_name = self.user_info.get('display_name') or self.user_info.get('username', 'User')
         header_lbl = ttk.Label(self.sidebar_frame, 
-                              text=f"Welcome,\n{self.user_info['username']}", 
+                              text=f"Welcome,\n{display_name}", 
                               font=FONTS['h2'], justify="center")
         header_lbl.pack(fill='x', pady=20, padx=10)
         

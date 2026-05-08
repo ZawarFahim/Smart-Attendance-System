@@ -4,10 +4,10 @@ Admin Dashboard to manage students, faculty, and view system logs.
 import tkinter as tk
 from tkinter import ttk, messagebox
 from gui.dashboard import BaseDashboard
-from config.settings import FONTS, COLORS
-from services.user_service import get_all_students
-from services.user_service import get_all_faculty
-from services.user_service import (
+from config.settings import FONTS, COLORS, EXCEL_IMPORT_PATH
+from services.student_service import get_all_students
+from services.faculty_service import get_all_faculty
+from services.admin_service import (
     get_all_courses,
     add_course,
     update_course,
@@ -31,8 +31,9 @@ from services.user_service import (
     add_enrollment,
     get_eligible_sections_for_student
 )
-from services.user_service import get_all_leave_requests, review_leave_request
-from services.user_service import create_notification, broadcast_notification
+from services.leave_service import get_all_leave_requests, review_leave_request
+from services.notification_service import create_notification, broadcast_notification
+from services.excel_import_service import import_students_from_excel
 from tkinter import filedialog
 from services.report_service import (
     get_overall_attendance_stats,
@@ -54,6 +55,7 @@ class AdminDashboard(BaseDashboard):
     def setup_menu(self):
         self.add_menu_item("Overview", self.show_overview)
         self.add_menu_item("Manage Students", self.show_manage_students)
+        self.add_menu_item("Import Students", self.show_import_students)
         self.add_menu_item("Manage Faculty", self.show_manage_faculty)
         self.add_menu_item("Academic Setup", self.show_academic_setup)
         self.add_menu_item("Prereqs & Enrollment", self.show_prerequisites)
@@ -931,85 +933,152 @@ class AdminDashboard(BaseDashboard):
             
             ttk.Button(export_frame, text="Export Full Attendance Report (CSV)", style="Accent.TButton", command=handle_export).pack(side='right')
 
-            # Advanced SQL Reports Section
-            notebook = ttk.Notebook(self.content_frame)
-            notebook.pack(expand=True, fill='both', padx=16, pady=10)
+            # Charts Section
+            charts_frame = ttk.Frame(self.content_frame)
+            charts_frame.pack(fill='both', expand=True, padx=20, pady=(0, 20))
+            
+            # Overall Attendance Stats Pie Chart
+            stats = get_overall_attendance_stats()
+            if stats:
+                fig1 = Figure(figsize=(5, 4), dpi=100)
+                ax1 = fig1.add_subplot(111)
+                labels = [s['status_name'] for s in stats]
+                sizes = [s['count'] for s in stats]
+                ax1.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90, colors=['#2ecc71', '#e74c3c', '#f1c40f', '#3498db'])
+                ax1.axis('equal')
+                ax1.set_title('Overall Attendance Breakdown')
+                
+                canvas1 = FigureCanvasTkAgg(fig1, master=charts_frame)
+                canvas1.draw()
+                canvas1.get_tk_widget().pack(side='left', fill='both', expand=True, padx=(0, 10))
+            
+            # Department Attendance Rates Bar Chart
+            dept_rates = get_department_attendance_rates()
+            if dept_rates:
+                fig2 = Figure(figsize=(5, 4), dpi=100)
+                ax2 = fig2.add_subplot(111)
+                depts = [d['dept_name'] for d in dept_rates]
+                rates = [float(d['present_rate']) for d in dept_rates]
+                
+                ax2.bar(depts, rates, color='#3498db')
+                ax2.set_ylabel('Present Rate (%)')
+                ax2.set_title('Attendance Rate by Department')
+                ax2.set_ylim(0, 100)
+                fig2.autofmt_xdate() # Rotate x labels
+                
+                canvas2 = FigureCanvasTkAgg(fig2, master=charts_frame)
+                canvas2.draw()
+                canvas2.get_tk_widget().pack(side='right', fill='both', expand=True, padx=(10, 0))
 
-            # Tab 1: Faculty Workload (Ranked)
-            tab_workload = ttk.Frame(notebook, style="Content.TFrame")
-            notebook.add(tab_workload, text="Faculty Workload (Ranked)")
-            cols_workload = ("Faculty ID", "First Name", "Last Name", "Total Sections", "Total Credits", "Weekly Hours", "Weekly Slots", "Workload Rank")
-            tree_workload = self._build_table(tab_workload, cols_workload)
-            for row in get_faculty_workload_report():
-                tree_workload.insert(
-                    "",
-                    "end",
-                    values=(
-                        row['faculty_id'],
-                        row['first_name'],
-                        row['last_name'],
-                        row['total_sections'],
-                        row['total_credits'],
-                        f"{row['weekly_teaching_hours']:.2f}",
-                        row['weekly_class_slots'],
-                        row['workload_rank'],
-                    ),
+        self.switch_view(view)
+
+    def show_import_students(self):
+        """Admin panel: bulk import students from an Excel file."""
+        def view():
+            ttk.Label(self.content_frame, text="Import Students from Excel",
+                      style="PageTitle.TLabel").pack(pady=(24, 8))
+
+            info_card = ttk.Frame(self.content_frame, style="Card.TFrame", padding=12)
+            info_card.pack(fill='x', padx=20, pady=(0, 12))
+            ttk.Label(
+                info_card,
+                text=("Select an Excel file with student records.\n"
+                      "Required: Column B = reg_no  |  Column C = name\n"
+                      "Optional: Column E = email  (auto-generated as u{reg_no}@giki.edu.pk if blank)"),
+                style="CardBody.TLabel",
+                justify='left'
+            ).pack(anchor='w')
+
+            # ── File path section ──────────────────────────────────────────────
+            path_frame = ttk.Frame(self.content_frame, style="Card.TFrame", padding=16)
+            path_frame.pack(fill='x', padx=20, pady=(0, 8))
+            ttk.Label(path_frame, text="Excel File Path", style="CardBody.TLabel").grid(
+                row=0, column=0, sticky='w', pady=(0, 6))
+
+            path_var = tk.StringVar(value=EXCEL_IMPORT_PATH)
+            path_entry = ttk.Entry(path_frame, textvariable=path_var, font=FONTS['body'])
+            path_entry.grid(row=1, column=0, sticky='ew', padx=(0, 10))
+
+            def browse_file():
+                fp = filedialog.askopenfilename(
+                    title="Select Excel File",
+                    filetypes=[("Excel Files", "*.xlsx *.xls"), ("All Files", "*.*")]
                 )
+                if fp:
+                    path_var.set(fp)
 
-            # Tab 2: Semester Workload Summary
-            tab_sem = ttk.Frame(notebook, style="Content.TFrame")
-            notebook.add(tab_sem, text="Workload by Semester")
-            cols_sem = ("Faculty ID", "First Name", "Last Name", "Semester", "Year", "Sections", "Courses", "Weekly Hours", "Weekly Slots")
-            tree_sem = self._build_table(tab_sem, cols_sem)
-            for row in get_faculty_workload_semester_summary():
-                tree_sem.insert(
-                    "",
-                    "end",
-                    values=(
-                        row['faculty_id'],
-                        row['first_name'],
-                        row['last_name'],
-                        row['semester'],
-                        row['academic_year'],
-                        row['total_sections'],
-                        row['total_courses'],
-                        f"{row['weekly_teaching_hours']:.2f}",
-                        row['weekly_class_slots'],
-                    ),
-                )
+            ttk.Button(path_frame, text="Browse…", command=browse_file).grid(
+                row=1, column=1, sticky='w')
+            path_frame.grid_columnconfigure(0, weight=1)
 
-            # Tab 3: Monthly Sessions
-            tab_month = ttk.Frame(notebook, style="Content.TFrame")
-            notebook.add(tab_month, text="Monthly Faculty Sessions")
-            cols_month = ("Faculty ID", "Month Start", "Total Sessions", "Distinct Sections")
-            tree_month = self._build_table(tab_month, cols_month)
-            for row in get_faculty_monthly_sessions():
-                tree_month.insert(
-                    "",
-                    "end",
-                    values=(
-                        row['faculty_id'],
-                        row['month_start'],
-                        row['total_sessions_created'],
-                        row['distinct_sections'],
-                    ),
-                )
+            # ── Department selection ──────────────────────────────────────────
+            dept_frame = ttk.Frame(self.content_frame, style="Card.TFrame", padding=16)
+            dept_frame.pack(fill='x', padx=20, pady=(0, 8))
+            ttk.Label(dept_frame, text="Default Department (optional)",
+                      style="CardBody.TLabel").pack(anchor='w', pady=(0, 6))
 
-            # Tab 4: Department Rankings
-            tab_dept = ttk.Frame(notebook, style="Content.TFrame")
-            notebook.add(tab_dept, text="Department Attendance Rankings")
-            cols_dept = ("Department", "Course Code", "Course Name", "Total Records", "Present Count", "Percentage", "Rank in Dept")
-            tree_dept = self._build_table(tab_dept, cols_dept)
-            for row in get_department_ranking():
-                tree_dept.insert("", "end", values=(row['dept_name'], row['course_code'], row['course_name'], row['total_attendance_records'], row['total_present'], f"{row['dept_course_attendance_percentage']:.2f}%", row['rank_in_dept']))
+            departments = get_all_departments()
+            dept_map = {"-- None --": None}
+            dept_map.update({d['dept_name']: d['dept_id'] for d in departments})
+            dept_combo = ttk.Combobox(dept_frame, values=list(dept_map.keys()),
+                                      state='readonly', font=FONTS['body'])
+            dept_combo.pack(fill='x')
+            dept_combo.set("-- None --")
 
-            # Tab 5: Student Attendance Trends
-            tab_trends = ttk.Frame(notebook, style="Content.TFrame")
-            notebook.add(tab_trends, text="Student Attendance Trends (LAG)")
-            cols_trends = ("Student ID", "Section ID", "Session Date", "Current Status", "Previous Status")
-            tree_trends = self._build_table(tab_trends, cols_trends)
-            for row in get_student_trends():
-                tree_trends.insert("", "end", values=(row['student_id'], row['section_id'], row['session_date'], row['status_name'], row['previous_status']))
+            # ── Results area ──────────────────────────────────────────────────
+            result_frame = ttk.Frame(self.content_frame, style="Card.TFrame", padding=16)
+            result_frame.pack(fill='both', expand=True, padx=20, pady=(0, 20))
+            result_text = tk.Text(result_frame, font=FONTS['body'], height=12,
+                                  state='disabled', wrap='word')
+            result_text.pack(fill='both', expand=True)
+
+            def _log(msg: str):
+                result_text.config(state='normal')
+                result_text.insert('end', msg + "\n")
+                result_text.see('end')
+                result_text.config(state='disabled')
+
+            # ── Import button ─────────────────────────────────────────────────
+            def run_import():
+                filepath = path_var.get().strip()
+                if not filepath:
+                    messagebox.showerror("Input Error",
+                                         "Please select an Excel file first.",
+                                         parent=self)
+                    return
+
+                dept_name = dept_combo.get()
+                dept_id = dept_map.get(dept_name)  # None if "-- None --"
+
+                result_text.config(state='normal')
+                result_text.delete('1.0', 'end')
+                result_text.config(state='disabled')
+
+                _log(f"Starting import from: {filepath}")
+                _log(f"Default department: {dept_name}")
+                _log("─" * 50)
+
+                try:
+                    summary = import_students_from_excel(filepath, default_dept_id=dept_id)
+                    _log(f"✅  Inserted : {summary['inserted_count']  } student(s)")
+                    _log(f"⏭  Skipped  : {summary['skipped_count']   } (already exist)")
+                    _log(f"❌  Failed   : {len(summary['failed_rows'])} row(s)")
+                    if summary['failed_rows']:
+                        _log("\nFailed rows detail:")
+                        for fr in summary['failed_rows']:
+                            _log(f"  Row {fr['row_index']:>4} | reg_no={fr['reg_no']!r:20} | {fr['reason']}")
+                    _log("\nImport complete.")
+                except FileNotFoundError as e:
+                    _log(f"ERROR: {e}")
+                    messagebox.showerror("File Not Found", str(e), parent=self)
+                except Exception as e:
+                    _log(f"ERROR: {e}")
+                    messagebox.showerror("Import Error", str(e), parent=self)
+
+            btn_row = ttk.Frame(self.content_frame, style="Content.TFrame")
+            btn_row.pack(fill='x', padx=20, pady=(0, 10))
+            ttk.Button(btn_row, text="▶  Run Import", style="Accent.TButton",
+                       command=run_import).pack(side='left')
 
         self.switch_view(view)
 

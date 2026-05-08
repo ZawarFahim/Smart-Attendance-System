@@ -29,3 +29,15 @@ FONTS = {
 
 # Window Dimensions
 WINDOW_GEOMETRY = "1024x768"
+
+# ==================================================
+# Excel Bulk Import Configuration
+# ==================================================
+# Set this to the absolute or relative path of the Excel file
+# containing student records to import.
+# The admin can also override this from the UI at runtime.
+# Expected Excel columns:
+#   Column B (index 1) → reg_no
+#   Column C (index 2) → name
+#   Column E (index 4) → email (auto-generated from reg_no if empty)
+EXCEL_IMPORT_PATH = ""  # e.g. "C:/data/students.xlsx" or leave blank to use UI picker
