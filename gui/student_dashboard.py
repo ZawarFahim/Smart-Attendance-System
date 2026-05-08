@@ -20,6 +20,9 @@ from services.report_service import (
 )
 from utils.validators import is_valid_date
 from datetime import datetime
+from PIL import Image, ImageTk
+from services.image_service import upload_profile_image, get_student_profile_image
+from tkinter import filedialog
 
 class StudentDashboard(BaseDashboard):
     def __init__(self, user_info, on_logout=None):
@@ -33,6 +36,8 @@ class StudentDashboard(BaseDashboard):
         self.add_menu_item("My Timetable", self.show_timetable)
         self.add_menu_item("Leave Requests", self.show_leave_requests)
         self.add_menu_item("Notifications", self.show_notifications)
+        
+        self.add_menu_item("My Profile", self.show_profile)
         
         # Default view
         self.show_overview()
@@ -305,4 +310,57 @@ class StudentDashboard(BaseDashboard):
             ttk.Button(actions, text="Mark as Read", style="Accent.TButton", command=set_read).pack(side='left')
             tree.bind("<<TreeviewSelect>>", on_select)
             load_notifications()
+        self.switch_view(view)
+
+    def show_profile(self):
+        def view():
+            ttk.Label(self.content_frame, text="My Profile", style="PageTitle.TLabel").pack(pady=(24, 16))
+            
+            card = ttk.Frame(self.content_frame, style="Card.TFrame", padding=20)
+            card.pack(fill='x', padx=20, pady=10)
+            
+            img_frame = ttk.Frame(card)
+            img_frame.pack(side='left', padx=(0, 20))
+            
+            self.img_label = ttk.Label(img_frame, text="No Image", background="#ddd", width=20, anchor='center')
+            self.img_label.pack(pady=(0, 10))
+            
+            def load_image():
+                img_path = get_student_profile_image(self.user_info['user_id'])
+                if img_path:
+                    try:
+                        img = Image.open(img_path)
+                        img.thumbnail((150, 150))
+                        photo = ImageTk.PhotoImage(img)
+                        self.img_label.config(image=photo, text="")
+                        self.img_label.image = photo
+                    except Exception as e:
+                        self.img_label.config(text="Error loading image")
+                else:
+                    self.img_label.config(text="No Image", image='')
+                    self.img_label.image = None
+            
+            def upload_image():
+                file_path = filedialog.askopenfilename(
+                    title="Select Profile Image",
+                    filetypes=[("Image Files", "*.png;*.jpg;*.jpeg")]
+                )
+                if file_path:
+                    success, msg = upload_profile_image(self.user_info['user_id'], file_path)
+                    if success:
+                        messagebox.showinfo("Success", msg)
+                        load_image()
+                    else:
+                        messagebox.showerror("Error", msg)
+                        
+            ttk.Button(img_frame, text="Upload Image", command=upload_image).pack()
+            
+            info_frame = ttk.Frame(card)
+            info_frame.pack(side='left', fill='both', expand=True)
+            
+            ttk.Label(info_frame, text=f"Username: {self.user_info.get('username', '')}", font=FONTS['h3']).pack(anchor='w', pady=(0, 5))
+            ttk.Label(info_frame, text=f"Role: {self.user_info.get('role', '')}", font=FONTS['body']).pack(anchor='w', pady=(0, 5))
+            
+            load_image()
+            
         self.switch_view(view)

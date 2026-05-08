@@ -4,7 +4,11 @@
 ALTER TABLE Users ADD CONSTRAINT chk_role CHECK (role IN ('Admin', 'Faculty', 'Student'));
 
 ALTER TABLE Students ADD CONSTRAINT fk_students_users FOREIGN KEY (student_id) REFERENCES Users(user_id) ON DELETE CASCADE;
-ALTER TABLE Students ADD CONSTRAINT fk_students_dept FOREIGN KEY (dept_id) REFERENCES Departments(dept_id) ON DELETE SET NULL;
+ALTER TABLE Students
+    ADD CONSTRAINT fk_students_dept FOREIGN KEY (dept_id) REFERENCES Departments(dept_id) ON DELETE SET NULL;
+
+ALTER TABLE StudentProfileImages
+    ADD CONSTRAINT fk_student_images_student FOREIGN KEY (student_id) REFERENCES Students(student_id) ON DELETE CASCADE;
 
 ALTER TABLE Faculty ADD CONSTRAINT fk_faculty_users FOREIGN KEY (faculty_id) REFERENCES Users(user_id) ON DELETE CASCADE;
 ALTER TABLE Faculty ADD CONSTRAINT fk_faculty_dept FOREIGN KEY (dept_id) REFERENCES Departments(dept_id) ON DELETE SET NULL;
