@@ -3,6 +3,7 @@ Admin Dashboard to manage students, faculty, and view system logs.
 """
 import tkinter as tk
 from tkinter import ttk, messagebox
+import threading  # needed to run Firebase sync off the main (UI) thread
 from gui.dashboard import BaseDashboard
 from config.settings import FONTS, COLORS, EXCEL_IMPORT_PATH
 from services.student_service import get_all_students
@@ -49,6 +50,7 @@ from services.report_service import (
 )
 from services.attendance_service import archive_attendance_for_semester
 from services.backup_service import backup_postgres_to_firebase, restore_firebase_to_postgres
+from services.firebase_service import test_firebase_connection  # connection-test utility
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
@@ -1316,34 +1318,160 @@ class AdminDashboard(BaseDashboard):
 
     def show_firebase_sync(self):
         def view():
-            ttk.Label(self.content_frame, text="Firebase Synchronization", style="PageTitle.TLabel").pack(pady=(24, 16))
-            
+            ttk.Label(self.content_frame, text="Firebase Synchronization",
+                      style="PageTitle.TLabel").pack(pady=(24, 16))
+
             card = ttk.Frame(self.content_frame, style="Card.TFrame", padding=20)
             card.pack(fill='x', padx=20, pady=10)
-            
-            ttk.Label(card, text="PostgreSQL ↔ Firebase Sync", style="CardHeader.TLabel").pack(anchor='w', pady=(0, 10))
-            ttk.Label(card, text="Use these tools to backup your entire PostgreSQL database to Firebase Firestore, or restore from Firestore to PostgreSQL. Note: Firebase must be properly configured.", style="CardBody.TLabel", wraplength=600).pack(anchor='w', pady=(0, 20))
-            
+
+            ttk.Label(card, text="PostgreSQL ↔ Firebase Sync",
+                      style="CardHeader.TLabel").pack(anchor='w', pady=(0, 10))
+            ttk.Label(
+                card,
+                text=("Use these tools to backup your entire PostgreSQL database to "
+                      "Firebase Firestore, or restore from Firestore to PostgreSQL. "
+                      "\n\nNote: Firestore must exist in the Firebase Console "
+                      "(Build → Firestore Database → Create database). "
+                      "Run 'Test Connection' first to verify credentials."),
+                style="CardBody.TLabel",
+                wraplength=620,
+                justify='left'
+            ).pack(anchor='w', pady=(0, 16))
+
+            # ── Status label (updated from background thread via after()) ────
+            status_var = tk.StringVar(value="")
+            status_label = ttk.Label(card, textvariable=status_var,
+                                     style="CardBody.TLabel", foreground="#18BC9C")
+            status_label.pack(anchor='w', pady=(0, 12))
+
             btn_frame = ttk.Frame(card, style="Card.TFrame")
             btn_frame.pack(fill='x')
-            
+
+            # ── Helper: run a blocking Firebase function in a daemon thread ──
+            # This prevents the Tkinter main loop from freezing during network I/O.
+            def _run_in_thread(label: str, fn, on_done_msg: str):
+                """
+                Run `fn()` in a background thread.
+                While running, disable all three buttons and show a progress message.
+                On completion call messagebox from the main thread via after().
+                """
+                # Collect button references for enable/disable
+                all_buttons = [btn_test, btn_backup, btn_restore]
+
+                def _worker():
+                    try:
+                        result = fn()
+                        # Schedule UI updates back on the main thread
+                        self.content_frame.after(
+                            0,
+                            lambda: _on_success(result)
+                        )
+                    except Exception as exc:
+                        self.content_frame.after(
+                            0,
+                            lambda e=exc: _on_error(e)
+                        )
+
+                def _on_success(result):
+                    status_var.set("")
+                    for b in all_buttons:
+                        b.configure(state="normal")
+                    messagebox.showinfo(
+                        f"{label} Complete",
+                        on_done_msg.format(result=result)
+                    )
+
+                def _on_error(exc):
+                    status_var.set("")
+                    for b in all_buttons:
+                        b.configure(state="normal")
+                    messagebox.showerror(
+                        f"{label} Failed",
+                        f"An error occurred:\n{exc}"
+                    )
+
+                # Disable buttons and show spinner text
+                for b in all_buttons:
+                    b.configure(state="disabled")
+                status_var.set(f"⏳ {label} in progress… please wait.")
+
+                # Daemon thread so it won't block app exit
+                t = threading.Thread(target=_worker, daemon=True)
+                t.start()
+
+            # ── Test Connection ──────────────────────────────────────────────
+            def do_test():
+                def _test():
+                    return test_firebase_connection()
+
+                def _after_test(result):
+                    status_var.set("")
+                    for b in [btn_test, btn_backup, btn_restore]:
+                        b.configure(state="normal")
+                    if result:
+                        messagebox.showinfo(
+                            "Connection OK",
+                            "Firebase authentication and Firestore connection are working correctly."
+                        )
+                    else:
+                        messagebox.showerror(
+                            "Connection Failed",
+                            "Could not connect to Firestore.\n\nCheck:\n"
+                            "  1. Your internet connection\n"
+                            "  2. That Firestore Database is created in the Firebase Console\n"
+                            "  3. That firebase_config.json is the latest service-account key\n"
+                            "  4. Windows clock is accurate (run: w32tm /resync)\n"
+                            "  5. No VPN/firewall blocking firestore.googleapis.com"
+                        )
+
+                for b in [btn_test, btn_backup, btn_restore]:
+                    b.configure(state="disabled")
+                status_var.set("⏳ Testing Firebase connection…")
+
+                def _worker():
+                    result = _test()
+                    self.content_frame.after(0, lambda r=result: _after_test(r))
+
+                threading.Thread(target=_worker, daemon=True).start()
+
+            # ── Backup handler ───────────────────────────────────────────────
             def do_backup():
-                if messagebox.askyesno("Confirm Backup", "This will upload all PostgreSQL records to Firebase. Depending on database size, this may take a moment. Proceed?"):
-                    try:
-                        count = backup_postgres_to_firebase()
-                        messagebox.showinfo("Backup Complete", f"Successfully synced {count} records to Firebase.")
-                    except Exception as e:
-                        messagebox.showerror("Backup Failed", f"An error occurred: {str(e)}")
-                        
+                if not messagebox.askyesno(
+                    "Confirm Backup",
+                    "This will upload all PostgreSQL records to Firebase Firestore.\n"
+                    "Depending on database size this may take a few minutes.\n\nProceed?"
+                ):
+                    return
+                _run_in_thread(
+                    label="Backup",
+                    fn=backup_postgres_to_firebase,
+                    on_done_msg="Successfully synced {result} records to Firestore."
+                )
+
+            # ── Restore handler ──────────────────────────────────────────────
             def do_restore():
-                if messagebox.askyesno("Confirm Restore", "This will download all records from Firebase and insert them into PostgreSQL (duplicates ignored). Proceed?"):
-                    try:
-                        count = restore_firebase_to_postgres()
-                        messagebox.showinfo("Restore Complete", f"Successfully restored {count} records to PostgreSQL.")
-                    except Exception as e:
-                        messagebox.showerror("Restore Failed", f"An error occurred: {str(e)}")
-            
-            ttk.Button(btn_frame, text="Backup to Firebase", style="Accent.TButton", command=do_backup).pack(side='left', padx=(0, 10))
-            ttk.Button(btn_frame, text="Restore from Firebase", command=do_restore).pack(side='left')
+                if not messagebox.askyesno(
+                    "Confirm Restore",
+                    "This will download all records from Firestore and insert them "
+                    "into PostgreSQL (duplicates are ignored).\n\nProceed?"
+                ):
+                    return
+                _run_in_thread(
+                    label="Restore",
+                    fn=restore_firebase_to_postgres,
+                    on_done_msg="Successfully restored {result} records to PostgreSQL."
+                )
+
+            # ── Buttons ──────────────────────────────────────────────────────
+            btn_test    = ttk.Button(btn_frame, text="Test Connection",
+                                     command=do_test)
+            btn_backup  = ttk.Button(btn_frame, text="Backup to Firebase",
+                                     style="Accent.TButton", command=do_backup)
+            btn_restore = ttk.Button(btn_frame, text="Restore from Firebase",
+                                     command=do_restore)
+
+            btn_test.pack(side='left', padx=(0, 10))
+            btn_backup.pack(side='left', padx=(0, 10))
+            btn_restore.pack(side='left')
 
         self.switch_view(view)

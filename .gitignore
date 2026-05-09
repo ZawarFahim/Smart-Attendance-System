@@ -1,0 +1,44 @@
+# ─── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.spec
+
+# ─── Virtual Environment ────────────────────────────────────────────────────────
+venv/
+env/
+.venv/
+.env.local
+
+# ─── SECRETS / CREDENTIALS — never commit these ────────────────────────────────
+.env
+*.json.secret
+# Firebase service account key files (keep firebase_config.json.example only)
+attendify-a38fe-firebase-adminsdk-fbsvc-726850afad.json
+firebase_config.json
+
+# ─── Database ──────────────────────────────────────────────────────────────────
+database.ini
+
+# ─── OS / IDE ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ─── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Uploads ───────────────────────────────────────────────────────────────────
+uploads/*
+!uploads/.gitkeep
