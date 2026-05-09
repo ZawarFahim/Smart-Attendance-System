@@ -40,4 +40,4 @@ WINDOW_GEOMETRY = "1024x768"
 #   Column B (index 1) → reg_no
 #   Column C (index 2) → name
 #   Column E (index 4) → email (auto-generated from reg_no if empty)
-EXCEL_IMPORT_PATH = ""  # e.g. "C:/data/students.xlsx" or leave blank to use UI picker
+EXCEL_IMPORT_PATH = "C:/Users/USER/Downloads/March-2026.xlsx"  # e.g. "C:/data/students.xlsx" or leave blank to use UI picker

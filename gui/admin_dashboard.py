@@ -6,7 +6,7 @@ from tkinter import ttk, messagebox
 from gui.dashboard import BaseDashboard
 from config.settings import FONTS, COLORS, EXCEL_IMPORT_PATH
 from services.student_service import get_all_students
-from services.faculty_service import get_all_faculty
+from services.faculty_service import get_all_faculty, add_faculty
 from services.admin_service import (
     get_all_courses,
     add_course,
@@ -33,7 +33,7 @@ from services.admin_service import (
 )
 from services.leave_service import get_all_leave_requests, review_leave_request
 from services.notification_service import create_notification, broadcast_notification
-from services.excel_import_service import import_students_from_excel
+from services.excel_import_service import import_students_from_excel, import_faculty_from_excel
 from tkinter import filedialog
 from services.report_service import (
     get_overall_attendance_stats,
@@ -49,6 +49,9 @@ from services.report_service import (
 )
 from services.attendance_service import archive_attendance_for_semester
 from services.backup_service import backup_postgres_to_firebase, restore_firebase_to_postgres
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
 
 class AdminDashboard(BaseDashboard):
     def __init__(self, user_info, on_logout=None):
@@ -146,31 +149,178 @@ class AdminDashboard(BaseDashboard):
 
     def show_manage_faculty(self):
         def view():
-            ttk.Label(self.content_frame, text="Faculty", style="PageTitle.TLabel").pack(pady=(24, 16))
-            
-            # Search Bar
+            ttk.Label(self.content_frame, text="Faculty Management",
+                      style="PageTitle.TLabel").pack(pady=(24, 16))
+
+            # ── Add Faculty Form ──────────────────────────────────────────────
+            form_card = ttk.Frame(self.content_frame, style="Card.TFrame", padding=16)
+            form_card.pack(fill='x', padx=20, pady=(0, 12))
+            ttk.Label(form_card, text="Add Faculty",
+                      style="CardHeader.TLabel").grid(row=0, column=0, columnspan=2,
+                                                      sticky='w', pady=(0, 10))
+
+            ttk.Label(form_card, text="Full Name",
+                      style="CardBody.TLabel").grid(row=1, column=0, sticky='w', pady=4)
+            name_entry = ttk.Entry(form_card, font=FONTS['body'])
+            name_entry.grid(row=1, column=1, sticky='ew', pady=4, padx=(12, 0))
+
+            ttk.Label(form_card, text="Email",
+                      style="CardBody.TLabel").grid(row=2, column=0, sticky='w', pady=4)
+            email_entry = ttk.Entry(form_card, font=FONTS['body'])
+            email_entry.grid(row=2, column=1, sticky='ew', pady=4, padx=(12, 0))
+
+            departments = get_all_departments()
+            dept_map = {d['dept_name']: d['dept_id'] for d in departments}
+            ttk.Label(form_card, text="Department",
+                      style="CardBody.TLabel").grid(row=3, column=0, sticky='w', pady=4)
+            dept_combo = ttk.Combobox(form_card, values=list(dept_map.keys()),
+                                      state='readonly', font=FONTS['body'])
+            dept_combo.grid(row=3, column=1, sticky='ew', pady=4, padx=(12, 0))
+            if dept_map:
+                dept_combo.current(0)
+
+            ttk.Label(form_card, text="Designation",
+                      style="CardBody.TLabel").grid(row=4, column=0, sticky='w', pady=4)
+            desig_entry = ttk.Entry(form_card, font=FONTS['body'])
+            desig_entry.grid(row=4, column=1, sticky='ew', pady=4, padx=(12, 0))
+            desig_entry.insert(0, "Lecturer")
+
+            ttk.Label(form_card,
+                      text="  Password auto-set to department name (bcrypt-hashed)",
+                      style="CardBody.TLabel").grid(row=5, column=1, sticky='w',
+                                                    pady=(0, 6), padx=(12, 0))
+            form_card.grid_columnconfigure(1, weight=1)
+
+            # ── Search Bar ───────────────────────────────────────────────────
             search_frame = ttk.Frame(self.content_frame, style="Card.TFrame", padding=10)
             search_frame.pack(fill='x', padx=20, pady=(0, 10))
-            ttk.Label(search_frame, text="Search:", style="CardBody.TLabel").pack(side='left', padx=(0, 10))
+            ttk.Label(search_frame, text="Search:",
+                      style="CardBody.TLabel").pack(side='left', padx=(0, 10))
             search_entry = ttk.Entry(search_frame, font=FONTS['body'], width=30)
             search_entry.pack(side='left', padx=(0, 10))
-            
-            columns = ("ID", "Username", "First Name", "Last Name", "Hire Date", "Department")
+
+            # ── Faculty Table ─────────────────────────────────────────────────
+            columns = ("ID", "Username", "First Name", "Last Name",
+                       "Designation", "Hire Date", "Department")
             tree = self._build_table(self.content_frame, columns)
-            faculty = get_all_faculty()
-            
+
             def load_faculty(filter_text=""):
                 tree.delete(*tree.get_children())
-                for f in faculty:
-                    if filter_text.lower() in f['username'].lower() or filter_text.lower() in f['first_name'].lower() or filter_text.lower() in f['last_name'].lower():
-                        tree.insert("", "end", values=(f['faculty_id'], f['username'], f['first_name'], f['last_name'], f['hire_date'], f['dept_name']))
-            
-            def on_search(*args):
+                for f in get_all_faculty():
+                    fn = f.get('first_name', '') or ''
+                    ln = f.get('last_name', '')  or ''
+                    un = f.get('username', '')   or ''
+                    if (filter_text.lower() in un.lower()
+                            or filter_text.lower() in fn.lower()
+                            or filter_text.lower() in ln.lower()):
+                        tree.insert("", "end", values=(
+                            f['faculty_id'], un, fn, ln,
+                            f.get('designation', ''),
+                            f['hire_date'],
+                            f.get('dept_name', ''),
+                        ))
+
+            def on_search(*_args):
                 load_faculty(search_entry.get())
-                
+
+            # ── Submit Handler ───────────────────────────────────────────────
+            def submit_faculty():
+                full_name   = name_entry.get().strip()
+                email       = email_entry.get().strip()
+                dept_name   = dept_combo.get().strip()
+                designation = desig_entry.get().strip()
+
+                if not full_name or not email or not dept_name:
+                    messagebox.showerror(
+                        "Validation Error",
+                        "Full Name, Email, and Department are required."
+                    )
+                    return
+
+                username = email.split("@")[0].strip()
+                if not username:
+                    messagebox.showerror("Validation Error", "Invalid email address.")
+                    return
+
+                name_parts = full_name.split(" ", 1)
+                first_name = name_parts[0]
+                last_name  = name_parts[1] if len(name_parts) > 1 else ""
+                dept_id    = dept_map.get(dept_name)
+
+                # Auto-generate password = department name, bcrypt-hashed
+                from utils.helpers import hash_password
+                password_hash = hash_password(dept_name)
+
+                success = add_faculty(
+                    username, email, password_hash,
+                    first_name, last_name, dept_id,
+                    designation if designation else None
+                )
+
+                if success:
+                    messagebox.showinfo(
+                        "Faculty Added",
+                        f"Faculty added successfully!\n\n"
+                        f"Username : {username}\n"
+                        f"Password : {dept_name}\n"
+                        f"(share credentials securely)"
+                    )
+                    name_entry.delete(0, 'end')
+                    email_entry.delete(0, 'end')
+                    desig_entry.delete(0, 'end')
+                    desig_entry.insert(0, "Lecturer")
+                    if dept_map:
+                        dept_combo.current(0)
+                    load_faculty(search_entry.get())
+                else:
+                    messagebox.showerror(
+                        "Error",
+                        "Failed to add faculty.\n"
+                        "Email or username may already be in use.\n"
+                        "Also ensure sql/add_faculty_designation.sql has been run."
+                    )
+
+            def run_excel_import():
+                filepath = filedialog.askopenfilename(
+                    title="Select Excel File",
+                    filetypes=[("Excel Files", "*.xlsx *.xls"), ("All Files", "*.*")]
+                )
+                if not filepath:
+                    return
+
+                dept_name = dept_combo.get().strip()
+                dept_id = dept_map.get(dept_name) if dept_map else None
+
+                try:
+                    summary = import_faculty_from_excel(filepath, default_dept_id=dept_id)
+                    msg = (
+                        f"Import Complete!\n\n"
+                        f"Inserted: {summary['inserted_count']}\n"
+                        f"Skipped (Exists): {summary['skipped_count']}\n"
+                        f"Failed: {len(summary['failed_rows'])}"
+                    )
+                    if summary['failed_rows']:
+                        msg += "\n\nCheck console for failure details."
+                        for fr in summary['failed_rows']:
+                            print(f"Failed Row {fr.get('row_index', '?')} ({fr.get('email', '?')}): {fr.get('reason', '?')}")
+                    
+                    messagebox.showinfo("Import Summary", msg)
+                    load_faculty(search_entry.get())
+                except Exception as e:
+                    messagebox.showerror("Import Error", f"Failed to import: {e}")
+
+            actions = ttk.Frame(form_card, style="Card.TFrame")
+            actions.grid(row=6, column=1, sticky='e', pady=(8, 0))
+            ttk.Button(actions, text="Import from Excel", command=run_excel_import).pack(side='left', padx=(0, 10))
+            ttk.Button(actions, text="Add Faculty", style="Accent.TButton",
+                       command=submit_faculty).pack(side='left')
+
             search_entry.bind('<KeyRelease>', on_search)
             load_faculty()
+
         self.switch_view(view)
+
+
 
     def show_academic_setup(self):
         def view():

@@ -21,7 +21,7 @@ Usage:
 """
 
 import pandas as pd
-from config.db_config import get_connection
+from db import get_connection
 
 # ── Password hashing ──────────────────────────────────────────────────────────
 # Try bcrypt first; fall back to the project's existing plaintext convention
@@ -202,6 +202,181 @@ def import_students_from_excel(
                     summary["failed_rows"].append({
                         "row_index": excel_row_idx + 1,
                         "reg_no": reg_no,
+                        "reason": str(row_exc),
+                    })
+
+    finally:
+        conn.close()
+
+    return summary
+
+
+def import_faculty_from_excel(
+    filepath: str,
+    default_dept_id: int = None,
+) -> dict:
+    """
+    Import faculty from an Excel file into PostgreSQL.
+
+    Expected columns (0-indexed without header):
+      0 (Col A): name
+      1 (Col B): designation (Optional, defaults to Lecturer)
+      2 (Col C): email
+      3 (Col D): department (Optional string name, if not provided uses default_dept_id)
+    """
+    summary = {
+        "inserted_count": 0,
+        "skipped_count": 0,
+        "failed_rows": [],
+    }
+
+    try:
+        df = pd.read_excel(filepath, header=None, dtype=str)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Excel file not found: {filepath}")
+    except Exception as exc:
+        raise ValueError(f"Failed to read Excel file: {exc}") from exc
+
+    required_indices = [0, 2] # Name and Email
+    for idx in required_indices:
+        if idx >= len(df.columns):
+            raise ValueError(
+                f"Excel file has only {len(df.columns)} columns. "
+                f"Expected at least Col A=name, Col C=email."
+            )
+
+    conn = get_connection()
+    if conn is None:
+        raise ConnectionError("Cannot connect to the database. Check database.ini.")
+
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT dept_id, dept_name FROM Departments")
+            dept_map = {row[1].strip().lower(): row[0] for row in cur.fetchall()}
+            
+            def get_dept_info(dept_str):
+                if not dept_str or str(dept_str).lower() in ("nan", "none", ""):
+                    if default_dept_id is not None:
+                        for d_name, d_id in dept_map.items():
+                            if d_id == default_dept_id:
+                                return d_id, "Faculty" # We just use Faculty or the UI will provide the right dept. Better: fetch the real name below if possible
+                    return default_dept_id, "Faculty"
+                
+                clean_str = str(dept_str).strip()
+                lower_str = clean_str.lower()
+                if lower_str in dept_map:
+                    return dept_map[lower_str], clean_str
+                
+                return default_dept_id, clean_str
+
+            # Known junk strings that appear as navigation/web-scraped rows
+            _JUNK_NAMES = {
+                "quick links", "admissions", "students", "faculty", "home",
+                "about", "contact", "news", "events", "login", "logout",
+                "search", "menu", "navigation", "academics", "research",
+                "departments", "programs", "courses", "alumni",
+                "name", "full name", "faculty name",  # header variants
+            }
+
+            for excel_row_idx, row in df.iterrows():
+                # ── Read raw cell values ─────────────────────────────────────
+                name        = str(row.iloc[0]).strip() if len(row) > 0 else ""
+                designation_raw = str(row.iloc[1]).strip() if len(row) > 1 else ""
+                email       = str(row.iloc[2]).strip() if len(row) > 2 else ""
+                dept_str    = str(row.iloc[3]).strip() if len(row) > 3 else ""
+
+                # ── Normalise sentinel values produced by pandas ─────────────
+                def _blank(v):
+                    return not v or v.lower() in ("nan", "none", "nat", "")
+
+                if _blank(name):
+                    continue  # fully empty row — silently skip
+
+                # ── Skip header / navigation / junk rows ─────────────────────
+                if name.lower() in _JUNK_NAMES:
+                    continue
+
+                # A real faculty name must contain at least one letter and
+                # must NOT be a purely numeric value (serial numbers, etc.)
+                import re as _re
+                if not _re.search(r"[A-Za-z]", name):
+                    continue  # all digits / symbols — junk
+
+                # ── Validate email ────────────────────────────────────────────
+                if _blank(email) or "@" not in email or "." not in email.split("@")[-1]:
+                    summary["failed_rows"].append({
+                        "row_index": excel_row_idx + 1,
+                        "name": name,
+                        "reason": f"Invalid or missing email: {email!r}",
+                    })
+                    continue
+
+                # ── Designation (optional) ────────────────────────────────────
+                designation = designation_raw if not _blank(designation_raw) else "Lecturer"
+
+
+                # dept_str already read at top of loop; resolve to dept_id + password
+                row_dept_id, password_raw = get_dept_info(dept_str)
+                # If password_raw is missing/generic and we have a valid row_dept_id, try to fetch real name
+                if password_raw == "Faculty" and row_dept_id is not None:
+                    cur.execute("SELECT dept_name FROM Departments WHERE dept_id = %s", (row_dept_id,))
+                    d_row = cur.fetchone()
+                    if d_row:
+                        password_raw = d_row[0]
+
+                username = email.split("@")[0].strip()
+                if not username:
+                    summary["failed_rows"].append({
+                        "row_index": excel_row_idx + 1,
+                        "email": email,
+                        "reason": "Invalid email format for username extraction",
+                    })
+                    continue
+
+                password_hash = _hash_password(password_raw)
+                name_parts = name.split(" ", 1)
+                first_name = name_parts[0]
+                last_name  = name_parts[1] if len(name_parts) > 1 else ""
+
+                try:
+                    cur.execute("SELECT 1 FROM Users WHERE email = %s OR username = %s LIMIT 1", (email, username))
+                    if cur.fetchone() is not None:
+                        summary["skipped_count"] += 1
+                        continue
+
+                    cur.execute(
+                        """
+                        INSERT INTO Users (username, email, password_hash, role)
+                        VALUES (%s, %s, %s, 'Faculty')
+                        ON CONFLICT (username) DO NOTHING
+                        RETURNING user_id
+                        """,
+                        (username, email, password_hash),
+                    )
+                    result = cur.fetchone()
+                    if result is None:
+                        summary["skipped_count"] += 1
+                        continue
+
+                    user_id = result[0]
+
+                    cur.execute(
+                        """
+                        INSERT INTO Faculty
+                            (faculty_id, first_name, last_name, dept_id, designation)
+                        VALUES (%s, %s, %s, %s, %s)
+                        """,
+                        (user_id, first_name, last_name, row_dept_id, designation),
+                    )
+
+                    conn.commit()
+                    summary["inserted_count"] += 1
+
+                except Exception as row_exc:
+                    conn.rollback()
+                    summary["failed_rows"].append({
+                        "row_index": excel_row_idx + 1,
+                        "email": email,
                         "reason": str(row_exc),
                     })
 

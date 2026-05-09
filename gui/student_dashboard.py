@@ -358,7 +358,7 @@ class StudentDashboard(BaseDashboard):
             info_frame = ttk.Frame(card)
             info_frame.pack(side='left', fill='both', expand=True)
             
-            ttk.Label(info_frame, text=f"Username: {self.user_info.get('username', '')}", font=FONTS['h3']).pack(anchor='w', pady=(0, 5))
+            ttk.Label(info_frame, text=f"Username: {self.user_info.get('username', '')}", font=FONTS['body_bold']).pack(anchor='w', pady=(0, 5))
             ttk.Label(info_frame, text=f"Role: {self.user_info.get('role', '')}", font=FONTS['body']).pack(anchor='w', pady=(0, 5))
             
             load_image()
