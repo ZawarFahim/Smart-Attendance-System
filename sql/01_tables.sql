@@ -83,12 +83,7 @@ CREATE TABLE StudentAttendance (
     remarks VARCHAR(255)
 );
 
-CREATE TABLE FacultyAttendance (
-    faculty_attendance_id SERIAL PRIMARY KEY,
-    faculty_id INTEGER,
-    date DATE NOT NULL,
-    status_id INTEGER
-);
+-- FacultyAttendance: REMOVED — never referenced by any Python service, view, trigger, or procedure.
 
 CREATE TABLE Timetable (
     timetable_id SERIAL PRIMARY KEY,
@@ -102,15 +97,7 @@ CREATE TABLE Timetable (
     is_recurring BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE ExamTimetable (
-    exam_id SERIAL PRIMARY KEY,
-    course_id INTEGER,
-    exam_date DATE NOT NULL,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    room_id INTEGER,
-    exam_type VARCHAR(50) NOT NULL
-);
+-- ExamTimetable: REMOVED — exam scheduling feature was never implemented in the application.
 
 CREATE TABLE LeaveRequests (
     leave_id SERIAL PRIMARY KEY,

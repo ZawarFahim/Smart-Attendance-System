@@ -37,9 +37,7 @@ ALTER TABLE StudentAttendance ADD CONSTRAINT fk_sa_student FOREIGN KEY (student_
 ALTER TABLE StudentAttendance ADD CONSTRAINT fk_sa_status FOREIGN KEY (status_id) REFERENCES AttendanceStatus(status_id);
 ALTER TABLE StudentAttendance ADD CONSTRAINT uq_sa_record UNIQUE (session_id, student_id);
 
-ALTER TABLE FacultyAttendance ADD CONSTRAINT fk_fa_faculty FOREIGN KEY (faculty_id) REFERENCES Faculty(faculty_id) ON DELETE CASCADE;
-ALTER TABLE FacultyAttendance ADD CONSTRAINT fk_fa_status FOREIGN KEY (status_id) REFERENCES AttendanceStatus(status_id);
-ALTER TABLE FacultyAttendance ADD CONSTRAINT uq_fa_record UNIQUE (faculty_id, date);
+-- FacultyAttendance constraints REMOVED
 
 ALTER TABLE Timetable ADD CONSTRAINT fk_tt_section FOREIGN KEY (section_id) REFERENCES Sections(section_id) ON DELETE CASCADE;
 ALTER TABLE Timetable ADD CONSTRAINT fk_tt_room FOREIGN KEY (room_id) REFERENCES Rooms(room_id) ON DELETE SET NULL;
@@ -47,10 +45,7 @@ ALTER TABLE Timetable ADD CONSTRAINT chk_tt_day CHECK (day_of_week IN ('Monday',
 ALTER TABLE Timetable ADD CONSTRAINT chk_tt_time CHECK (end_time > start_time);
 ALTER TABLE Timetable ADD CONSTRAINT uq_tt_slot UNIQUE (section_id, day_of_week, start_time);
 
-ALTER TABLE ExamTimetable ADD CONSTRAINT fk_exam_course FOREIGN KEY (course_id) REFERENCES Courses(course_id) ON DELETE CASCADE;
-ALTER TABLE ExamTimetable ADD CONSTRAINT fk_exam_room FOREIGN KEY (room_id) REFERENCES Rooms(room_id) ON DELETE SET NULL;
-ALTER TABLE ExamTimetable ADD CONSTRAINT chk_exam_type CHECK (exam_type IN ('Midterm', 'Final', 'Quiz', 'Lab'));
-ALTER TABLE ExamTimetable ADD CONSTRAINT chk_exam_time CHECK (end_time > start_time);
+-- ExamTimetable constraints REMOVED
 
 ALTER TABLE LeaveRequests ADD CONSTRAINT fk_leave_user FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE;
 ALTER TABLE LeaveRequests ADD CONSTRAINT fk_leave_reviewer FOREIGN KEY (reviewed_by) REFERENCES Users(user_id) ON DELETE SET NULL;
