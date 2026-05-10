@@ -7,7 +7,6 @@ CREATE INDEX idx_enrollment_section ON Enrollments(section_id);
 CREATE INDEX idx_attendance_session ON StudentAttendance(session_id);
 CREATE INDEX idx_attendance_student ON StudentAttendance(student_id);
 CREATE INDEX idx_timetable_section_day ON Timetable(section_id, day_of_week);
-CREATE INDEX idx_exam_course_date ON ExamTimetable(course_id, exam_date);
 CREATE INDEX idx_attendance_session_date ON AttendanceSessions(section_id, session_date);
 
 -- Composite Index for Query Optimization demonstration
