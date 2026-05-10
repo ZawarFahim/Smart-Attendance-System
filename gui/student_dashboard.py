@@ -7,17 +7,12 @@ from gui.dashboard import BaseDashboard
 from config.settings import FONTS, COLORS
 from services.attendance_service import (
     get_attendance_history,
-    get_attendance_history_all,
     get_student_sections,
     get_student_attendance_summary,
 )
 from services.timetable_service import get_timetable_for_student
-from services.user_service import create_leave_request, get_leave_requests_for_user, get_eligible_sections_for_student
+from services.user_service import create_leave_request, get_leave_requests_for_user
 from services.user_service import get_notifications, mark_as_read
-from services.report_service import (
-    get_student_prerequisite_status,
-    get_blocked_enrollments_for_student,
-)
 from utils.validators import is_valid_date
 from datetime import datetime
 from PIL import Image, ImageTk
@@ -32,7 +27,6 @@ class StudentDashboard(BaseDashboard):
         self.add_menu_item("Overview", self.show_overview)
         self.add_menu_item("My Attendance", self.show_attendance)
         self.add_menu_item("Attendance Summary", self.show_attendance_summary)
-        self.add_menu_item("Course Eligibility", self.show_prerequisites)
         self.add_menu_item("My Timetable", self.show_timetable)
         self.add_menu_item("Leave Requests", self.show_leave_requests)
         self.add_menu_item("Notifications", self.show_notifications)
@@ -92,10 +86,10 @@ class StudentDashboard(BaseDashboard):
 
     def show_attendance(self):
         def view():
-            ttk.Label(self.content_frame, text="Attendance History (Current + Archive)", style="PageTitle.TLabel").pack(pady=(24, 16))
-            columns = ("Date", "Course Code", "Course Name", "Status", "Source")
+            ttk.Label(self.content_frame, text="Attendance History", style="PageTitle.TLabel").pack(pady=(24, 16))
+            columns = ("Date", "Course Code", "Course Name", "Status")
             tree = self._build_table(self.content_frame, columns)
-            history = get_attendance_history_all(self.user_info['user_id'])
+            history = get_attendance_history(self.user_info['user_id'])
             for record in history:
                 tree.insert(
                     "",
@@ -105,7 +99,6 @@ class StudentDashboard(BaseDashboard):
                         record['course_code'],
                         record['course_name'],
                         record['status_name'],
-                        record['source'],
                     ),
                 )
                 
@@ -126,69 +119,7 @@ class StudentDashboard(BaseDashboard):
                 ))
         self.switch_view(view)
 
-    def show_prerequisites(self):
-        def view():
-            ttk.Label(self.content_frame, text="Course Eligibility & Prerequisites", style="PageTitle.TLabel").pack(pady=(24, 16))
 
-            notebook = ttk.Notebook(self.content_frame)
-            notebook.pack(expand=True, fill='both', padx=16, pady=10)
-
-            # Tab 1: Eligibility per Course
-            tab_status = ttk.Frame(notebook, style="Content.TFrame")
-            notebook.add(tab_status, text="Prerequisite Status")
-            cols_status = ("Course Code", "Course Name", "Total Prereqs", "Completed", "Eligible")
-            tree_status = self._build_table(tab_status, cols_status)
-            for row in get_student_prerequisite_status(self.user_info['user_id']):
-                tree_status.insert(
-                    "",
-                    "end",
-                    values=(
-                        row['course_code'],
-                        row['course_name'],
-                        row['prereq_count'],
-                        row['completed_prereq_count'],
-                        "Yes" if row['is_eligible'] else "No",
-                    ),
-                )
-
-            # Tab 2: Eligible Sections (enrollment suggestions)
-            tab_eligible = ttk.Frame(notebook, style="Content.TFrame")
-            notebook.add(tab_eligible, text="Eligible Sections")
-            cols_eligible = ("Section ID", "Course Code", "Course Name", "Semester", "Year")
-            tree_eligible = self._build_table(tab_eligible, cols_eligible)
-            for row in get_eligible_sections_for_student(self.user_info['user_id']):
-                tree_eligible.insert(
-                    "",
-                    "end",
-                    values=(
-                        row['section_id'],
-                        row['course_code'],
-                        row['course_name'],
-                        row['semester'],
-                        row['academic_year'],
-                    ),
-                )
-
-            # Tab 3: Blocked Enrollments with missing prerequisites
-            tab_blocked = ttk.Frame(notebook, style="Content.TFrame")
-            notebook.add(tab_blocked, text="Blocked Enrollments")
-            cols_blocked = ("Section ID", "Course Code", "Course Name", "Semester", "Year", "Missing Prereqs")
-            tree_blocked = self._build_table(tab_blocked, cols_blocked)
-            for row in get_blocked_enrollments_for_student(self.user_info['user_id']):
-                tree_blocked.insert(
-                    "",
-                    "end",
-                    values=(
-                        row['section_id'],
-                        row['course_code'],
-                        row['course_name'],
-                        row['semester'],
-                        row['academic_year'],
-                        row['missing_prerequisites'],
-                    ),
-                )
-
-        self.switch_view(view)
 
     def show_timetable(self):
         def view():

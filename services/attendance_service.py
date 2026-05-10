@@ -71,58 +71,6 @@ def get_attendance_history(student_id):
     return fetch_all(query, (student_id,))
 
 
-def get_attendance_history_all(student_id):
-    """
-    Get the full log of attendance for a student, including archived records.
-    Backed by the student_attendance_history_all view.
-    """
-    query = """
-        SELECT
-            session_date,
-            course_code,
-            course_name,
-            status_name,
-            source
-        FROM (
-            SELECT
-                sa.student_id,
-                asa.section_id,
-                asa.session_date,
-                asa.start_time,
-                asa.end_time,
-                st.status_name,
-                saa.remarks,
-                'archive'::text AS source,
-                c.course_code,
-                c.course_name
-            FROM StudentAttendanceArchive saa
-            JOIN AttendanceSessionsArchive asa ON asa.archive_session_id = saa.archive_session_id
-            JOIN AttendanceStatus st ON st.status_id = saa.status_id
-            JOIN Sections sec ON sec.section_id = asa.section_id
-            JOIN Courses c ON c.course_id = sec.course_id
-            WHERE saa.student_id = %s
-            UNION ALL
-            SELECT
-                sa.student_id,
-                sess.section_id,
-                sess.session_date,
-                sess.start_time,
-                sess.end_time,
-                st.status_name,
-                sa.remarks,
-                'current'::text AS source,
-                c.course_code,
-                c.course_name
-            FROM StudentAttendance sa
-            JOIN AttendanceSessions sess ON sess.session_id = sa.session_id
-            JOIN Sections sec ON sess.section_id = sec.section_id
-            JOIN Courses c ON sec.course_id = c.course_id
-            JOIN AttendanceStatus st ON st.status_id = sa.status_id
-            WHERE sa.student_id = %s
-        ) AS t
-        ORDER BY session_date DESC
-    """
-    return fetch_all(query, (student_id, student_id))
 
 def get_student_overall_attendance(student_id, section_id):
     """Gets the percentage via the Postgres function calculate_attendance_percentage."""
@@ -178,11 +126,3 @@ def get_faculty_session_history(faculty_id):
     """
     return fetch_all(query, (faculty_id,))
 
-
-def archive_attendance_for_semester(semester: str, academic_year: str, archived_by: int, reason: str = ""):
-    """
-    Archive attendance for a given semester/academic_year using the stored procedure.
-    Returns True on success, False on failure.
-    """
-    query = "CALL archive_attendance_for_semester(%s, %s, %s, %s)"
-    return execute_query(query, (semester, academic_year, archived_by, reason or None))

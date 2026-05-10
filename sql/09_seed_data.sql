@@ -4,7 +4,7 @@
 -- ==================================================
 
 -- First, remove all existing data so the script can be run multiple times safely
-TRUNCATE Departments, Users, Courses, Rooms, AttendanceStatus, CourseResultStatuses, AttendancePolicies CASCADE;
+TRUNCATE Departments, Users, Courses, Rooms, AttendanceStatus CASCADE;
 
 
 INSERT INTO Departments (dept_name) VALUES
@@ -107,16 +107,15 @@ INSERT INTO Timetable (section_id, day_of_week, start_time, end_time, room_id)
     FROM Sections s JOIN Courses c ON c.course_id = s.course_id
     WHERE c.course_code = 'CS201';
 
+
+
+-- ==================================================
+-- EXPANDED SAMPLE DATA (Appended)
+-- ==================================================
 -- ─────────────────────────────────────────────────────────────────────────────
--- FEATURE 1: PREREQUISITE / COMPLETION SEEDING
+-- FEATURE 1: PREREQUISITE SEEDING
 -- CS101 is a prerequisite for CS201
 -- ─────────────────────────────────────────────────────────────────────────────
-
-INSERT INTO CourseResultStatuses (status_code, status_name, is_passing) VALUES
-    ('PASSED', 'Passed', TRUE),
-    ('FAILED', 'Failed', FALSE),
-    ('INPROG', 'In Progress', FALSE)
-ON CONFLICT (status_code) DO NOTHING;
 
 INSERT INTO CoursePrerequisites (course_id, prereq_course_id)
 SELECT c2.course_id, c1.course_id
@@ -124,26 +123,6 @@ FROM Courses c1, Courses c2
 WHERE c1.course_code = 'CS101'
   AND c2.course_code = 'CS201'
 ON CONFLICT DO NOTHING;
-
--- stud1 has completed CS101 (can take CS201), stud2 has not.
-INSERT INTO StudentCourseResults (student_id, course_id, status_code)
-SELECT (SELECT user_id FROM Users WHERE username = 'stud1'),
-       (SELECT course_id FROM Courses WHERE course_code = 'CS101'),
-       'PASSED'
-ON CONFLICT (student_id, course_id) DO UPDATE SET status_code = EXCLUDED.status_code;
-
--- ─────────────────────────────────────────────────────────────────────────────
--- FEATURE 3: ATTENDANCE POLICY DEFAULT
--- Freeze after 120 minutes; archive after 365 days (configurable via procedure).
--- ─────────────────────────────────────────────────────────────────────────────
-
-INSERT INTO AttendancePolicies (policy_id, freeze_minutes, archive_after_days)
-VALUES (1, 120, 365)
-ON CONFLICT (policy_id) DO NOTHING;
-
--- ==================================================
--- EXPANDED SAMPLE DATA (Appended)
--- ==================================================
 
 -- 1. Additional Departments
 INSERT INTO Departments (dept_name) VALUES

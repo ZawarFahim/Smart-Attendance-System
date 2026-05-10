@@ -41,10 +41,8 @@ ATTENDIFY is a full-featured student attendance management system for universiti
 | **Auto Credential Generation** | Email (`u{reg_no}@giki.edu.pk`) and password (bcrypt-hashed `reg_no`) generated automatically |
 | **Role-Based Login** | Post-login greeting: `Welcome, {Full Name}` fetched from DB |
 | **Attendance Marking** | Faculty create sessions and mark Present / Absent / Late per student |
-| **Attendance Archive** | Freeze & archive semester attendance with full audit trail |
 | **Analytics Charts** | Pie and bar charts for overall attendance and department rates |
 | **Leave Requests** | Students/Faculty submit; Admin approves/rejects with notifications |
-| **Prerequisites Enforcement** | DB-level course prerequisite checks via stored procedures |
 | **Firebase Sync** | Full PostgreSQL ↔ Firebase Firestore backup & restore |
 | **Audit Logs** | Every data mutation tracked with actor and timestamp |
 | **Profile Images** | Students can upload/view their profile picture |
@@ -66,7 +64,7 @@ app.py                      ← Entry point
 │   ├── excel_import_service.py   ← NEW: Bulk Excel import
 │   ├── auth_service.py           ← Login + display_name resolution
 │   ├── user_service.py           ← All CRUD (students/faculty/admin)
-│   ├── attendance_service.py     ← Session create, mark, archive
+│   ├── attendance_service.py     ← Session create, mark
 │   ├── report_service.py         ← Analytics queries
 │   ├── backup_service.py         ← Firebase sync
 │   └── [shim files]             ← student/faculty/admin/leave/notification_service.py

@@ -29,8 +29,7 @@ from services.admin_service import (
     get_all_departments,
     get_audit_logs,
     get_all_enrollments,
-    add_enrollment,
-    get_eligible_sections_for_student
+    add_enrollment
 )
 from services.leave_service import get_all_leave_requests, review_leave_request
 from services.notification_service import create_notification, broadcast_notification
@@ -45,10 +44,8 @@ from services.report_service import (
     get_faculty_monthly_sessions,
     get_department_ranking,
     get_student_trends,
-    get_course_prerequisite_map,
-    get_student_prerequisite_status
+    get_course_prerequisite_map
 )
-from services.attendance_service import archive_attendance_for_semester
 from services.backup_service import backup_postgres_to_firebase, restore_firebase_to_postgres
 from services.firebase_service import test_firebase_connection  # connection-test utility
 from matplotlib.figure import Figure
@@ -69,7 +66,6 @@ class AdminDashboard(BaseDashboard):
         self.add_menu_item("Leave Requests", self.show_leave_requests)
         self.add_menu_item("Audit Logs", self.show_audit_logs)
         self.add_menu_item("Analytics", self.show_analytics)
-        self.add_menu_item("Attendance Archive", self.show_archive)
         self.add_menu_item("Broadcast", self.show_broadcast)
         self.add_menu_item("Firebase Sync", self.show_firebase_sync)
         
@@ -373,7 +369,7 @@ class AdminDashboard(BaseDashboard):
                     row['prereq_course_name'],
                 ))
 
-            # Tab 2: Manage Enrollments (with prerequisite enforcement)
+            # Tab 2: Manage Enrollments
             tab_enroll = ttk.Frame(notebook, style="Content.TFrame")
             notebook.add(tab_enroll, text="Enrollments")
 
@@ -401,12 +397,12 @@ class AdminDashboard(BaseDashboard):
                     messagebox.showerror("Validation Error", "IDs must be numeric.")
                     return
                 if add_enrollment(int(sid), int(sec)):
-                    messagebox.showinfo("Success", "Enrollment created successfully (prerequisites validated in database).")
+                    messagebox.showinfo("Success", "Enrollment created successfully.")
                     load_enrollments()
                 else:
                     messagebox.showerror(
                         "Enrollment Failed",
-                        "Could not enroll student. Check prerequisites, uniqueness, and IDs."
+                        "Could not enroll student. Check uniqueness and IDs."
                     )
 
             ttk.Button(top_frame, text="Enroll Student", style="Accent.TButton", command=handle_enroll)\
@@ -1274,47 +1270,6 @@ class AdminDashboard(BaseDashboard):
 
         self.switch_view(view)
 
-    def show_archive(self):
-        def view():
-            ttk.Label(self.content_frame, text="Attendance Archive & Freeze", style="PageTitle.TLabel").pack(pady=(24, 16))
-
-            control = ttk.Frame(self.content_frame, style="Card.TFrame", padding=16)
-            control.pack(fill='x', padx=20, pady=(0, 16))
-
-            ttk.Label(control, text="Semester", style="CardBody.TLabel").grid(row=0, column=0, sticky='w')
-            semester_combo = ttk.Combobox(control, values=["Spring", "Summer", "Fall", "Winter"], state='readonly', font=FONTS['body'])
-            semester_combo.grid(row=0, column=1, sticky='w', padx=(8, 24))
-            semester_combo.set("Fall")
-
-            ttk.Label(control, text="Academic Year", style="CardBody.TLabel").grid(row=0, column=2, sticky='w')
-            year_entry = ttk.Entry(control, font=FONTS['body'])
-            year_entry.grid(row=0, column=3, sticky='w', padx=(8, 24))
-            year_entry.insert(0, "2026-2027")
-
-            ttk.Label(control, text="Reason", style="CardBody.TLabel").grid(row=1, column=0, sticky='w', pady=(8, 0))
-            reason_entry = ttk.Entry(control, font=FONTS['body'])
-            reason_entry.grid(row=1, column=1, columnspan=3, sticky='ew', padx=(8, 0), pady=(8, 0))
-
-            control.grid_columnconfigure(3, weight=1)
-
-            def do_archive():
-                sem = semester_combo.get().strip()
-                year = year_entry.get().strip()
-                reason = reason_entry.get().strip()
-                if not sem or not year:
-                    messagebox.showerror("Validation Error", "Semester and Academic Year are required.")
-                    return
-                if not messagebox.askyesno("Confirm Archive", f"Archive attendance for {sem} {year}?"):
-                    return
-                if archive_attendance_for_semester(sem, year, self.user_info['user_id'], reason):
-                    messagebox.showinfo("Success", "Archive operation completed.")
-                else:
-                    messagebox.showerror("Error", "Failed to archive attendance. See server logs for details.")
-
-            ttk.Button(control, text="Archive Attendance", style="Accent.TButton", command=do_archive)\
-                .grid(row=0, column=4, rowspan=2, padx=(12, 0), sticky='e')
-
-        self.switch_view(view)
 
     def show_firebase_sync(self):
         def view():

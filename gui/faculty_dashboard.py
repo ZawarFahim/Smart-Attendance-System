@@ -11,7 +11,6 @@ from services.attendance_service import (
     get_students_for_section,
     submit_attendance,
     get_faculty_session_history,
-    get_attendance_history_all,
 )
 from services.timetable_service import get_timetable_for_faculty
 from services.user_service import create_leave_request, get_leave_requests_for_user
@@ -306,8 +305,8 @@ class FacultyDashboard(BaseDashboard):
 
     def show_history(self):
         def view():
-            ttk.Label(self.content_frame, text="Student Attendance History (Current + Archive)", style="PageTitle.TLabel").pack(pady=(24, 16))
-            columns = ("Date", "Course Code", "Course Name", "Status", "Source")
+            ttk.Label(self.content_frame, text="Student Attendance History", style="PageTitle.TLabel").pack(pady=(24, 16))
+            columns = ("Date", "Course Code", "Course Name", "Status")
             tree = self._build_table(self.content_frame, columns)
 
             sections = {s['section_id'] for s in get_assigned_sections(self.user_info['user_id'])}

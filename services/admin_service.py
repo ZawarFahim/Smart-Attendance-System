@@ -25,7 +25,6 @@ from services.user_service import (
     get_audit_logs,
     get_all_enrollments,
     add_enrollment,
-    get_eligible_sections_for_student,
 )
 
 __all__ = [
@@ -50,5 +49,4 @@ __all__ = [
     "get_audit_logs",
     "get_all_enrollments",
     "add_enrollment",
-    "get_eligible_sections_for_student",
 ]

@@ -92,37 +92,7 @@ def get_course_prerequisite_map():
     return fetch_all(query)
 
 
-def get_student_prerequisite_status(student_id: int):
-    """Return prerequisite completion/eligibility per course for a given student."""
-    query = """
-        SELECT *
-        FROM student_course_prerequisite_status
-        WHERE student_id = %s
-        ORDER BY course_code
-    """
-    return fetch_all(query, (student_id,))
 
-
-def get_eligible_sections_for_student(student_id: int):
-    """Return sections the student is currently eligible to enroll in."""
-    query = """
-        SELECT *
-        FROM eligible_sections_for_student
-        WHERE student_id = %s
-        ORDER BY course_code, semester, academic_year
-    """
-    return fetch_all(query, (student_id,))
-
-
-def get_blocked_enrollments_for_student(student_id: int):
-    """Return sections blocked by unmet prerequisites for a given student."""
-    query = """
-        SELECT *
-        FROM blocked_enrollments_for_student
-        WHERE student_id = %s
-        ORDER BY course_code, semester, academic_year
-    """
-    return fetch_all(query, (student_id,))
 
 
 import csv
