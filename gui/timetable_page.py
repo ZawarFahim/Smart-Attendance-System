@@ -1,1 +1,0 @@
-# Placeholder for timetable_page.py
